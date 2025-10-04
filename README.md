@@ -67,7 +67,7 @@ make local-env-setup
 
 # Or with custom ports (defaults: 8080/8443 for Kind, 8888/8889 for Gateway)
 KIND_HOST_PORT_HTTP=8090 KIND_HOST_PORT_HTTPS=8453 make local-env-setup
-GATEWAY_LOCAL_PORT_HTTP=9000 GATEWAY_LOCAL_PORT_HTTPS=9001 make dev-gateway-forward
+GATEWAY_LOCAL_PORT_HTTP=9000 make dev-gateway-forward
 ```
 
 Run the MCP Inspector and connect to the gateway (This also port forwards to the gateway)
@@ -87,7 +87,7 @@ make oauth-example-setup
 ```
 
 This will:
-- Set up a Keycloak realm with user/groups/client scopes  
+- Set up a Keycloak realm with user/groups/client scopes
 - Configure the mcp-broker with OAuth environment variables
 - Apply AuthPolicy for token validation on the /mcp endpoint
 - Apply additional OAuth configurations
@@ -144,7 +144,7 @@ servers:
     hostname: weather.example.com
     enabled: true
     toolPrefix: "weather_"
-  - name: calendar-service  
+  - name: calendar-service
     url: http://calendar.example.com:8080
     hostname: calendar.example.com
     enabled: true
@@ -184,7 +184,7 @@ metadata:
 spec:
   targetRef:
     group: gateway.networking.k8s.io
-    kind: HTTPRoute  
+    kind: HTTPRoute
     name: calendar-route
   toolPrefix: cal_
 ```
@@ -227,7 +227,7 @@ The endpoint returns a JSON response following the OAuth Protected Resource disc
 ```json
 {
   "resource_name": "Production MCP Server",
-  "resource": "https://mcp.example.com/mcp", 
+  "resource": "https://mcp.example.com/mcp",
   "authorization_servers": [
     "https://keycloak.example.com/realms/mcp"
   ],
