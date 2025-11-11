@@ -8,6 +8,7 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcp-servers-ext
   hostnames:
     - 'oidc-server.127-0-0-1.sslip.io'
   rules:

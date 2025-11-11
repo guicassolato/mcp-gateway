@@ -44,7 +44,7 @@ data:
     {
         "acls": [
             {
-                "id": "server1.mcp.local",
+                "id": "mcp-server-1",
                 "access": {
                     "accounting": [
                         "test_headers"
@@ -55,7 +55,7 @@ data:
                 }
             },
             {
-                "id": "server2.mcp.local", 
+                "id": "mcp-server-2",
                 "access": {
                     "accounting": [
                         "test2_headers"
@@ -64,7 +64,7 @@ data:
             }
         ]
     }
-    
+
     # NOTE: This is an example ACL configuration. Replace with your own:
     # - "id" should match your MCP server hostnames
     # - "access" groups should match your Keycloak groups
@@ -95,7 +95,7 @@ spec:
         - name: config
           mountPath: /usr/share/nginx/html
         command: ["/bin/sh"]
-        args: ["-c", "cp /usr/share/nginx/html/config.json /usr/share/nginx/html/config/server1.mcp.local && cp /usr/share/nginx/html/config.json /usr/share/nginx/html/config/server2.mcp.local && nginx -g 'daemon off;'"]
+        args: ["-c", "cp /usr/share/nginx/html/config.json /usr/share/nginx/html/config/mcp-server-1 && cp /usr/share/nginx/html/config.json /usr/share/nginx/html/config/mcp-server-2 && nginx -g 'daemon off;'"]
       volumes:
       - name: config
         configMap:
@@ -160,7 +160,7 @@ spec:
           body:
             value: |
               {
-                "error": "Forbidden", 
+                "error": "Forbidden",
                 "message": "MCP Tool Access denied. Insufficient permissions for this tool."
               }
         unauthenticated:

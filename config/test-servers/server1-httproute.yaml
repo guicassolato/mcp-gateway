@@ -8,8 +8,9 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcps
   hostnames:
-    - 'server1.mcp.local' #note This is purely for internal routing by Envoy
+    - mcp-server-1 #note This is purely for internal routing by Envoy
   rules:
     - matches:
         - path:

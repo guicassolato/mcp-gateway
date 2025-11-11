@@ -27,25 +27,25 @@ data:
           ]
         },
         {
-          "clientId": "server1.mcp.local",
+          "clientId": "mcp-server-1",
           "publicClient": true,
           "standardFlowEnabled": false,
           "fullScopeAllowed": false
         },
         {
-          "clientId": "server2.mcp.local",
+          "clientId": "mcp-server-2",
           "publicClient": true,
           "standardFlowEnabled": false,
           "fullScopeAllowed": false
         },
         {
-          "clientId": "server3.mcp.local",
+          "clientId": "mcp-server-3",
           "publicClient": true,
           "standardFlowEnabled": false,
           "fullScopeAllowed": false
         },
         {
-          "clientId": "oidc-server.mcp.local",
+          "clientId": "oidc-mcp-server",
           "publicClient": true,
           "standardFlowEnabled": false,
           "fullScopeAllowed": false
@@ -58,7 +58,7 @@ data:
               "name": "impersonator"
             }
           ],
-          "server1.mcp.local": [
+          "mcp-server-1": [
             {
               "name": "greet"
             },
@@ -72,7 +72,7 @@ data:
               "name": "time"
             }
           ],
-          "server2.mcp.local": [
+          "mcp-server-2": [
             {
               "name": "auth1234"
             },
@@ -89,7 +89,7 @@ data:
               "name": "time"
             }
           ],
-          "server3.mcp.local": [
+          "mcp-server-3": [
             {
               "name": "time"
             },
@@ -103,7 +103,7 @@ data:
               "name": "pi"
             }
           ],
-          "oidc-server.mcp.local": [
+          "oidc-mcp-server": [
             {
               "name": "hello_world"
             }
@@ -122,13 +122,13 @@ data:
         {
           "name": "accounting",
           "clientRoles": {
-            "server1.mcp.local": [
+            "mcp-server-1": [
               "greet"
             ],
-            "server3.mcp.local": [
+            "mcp-server-3": [
               "add"
             ],
-            "oidc-server.mcp.local": [
+            "oidc-mcp-server": [
               "hello_world"
             ]
           }

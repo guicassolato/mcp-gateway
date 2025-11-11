@@ -9,8 +9,9 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcps
   hostnames:
-    - 'oidc-server.mcp.local' # note this is matching the gateway listener. It is purely for internal routing by Envoy
+    - oidc-mcp-server
   rules:
     - matches:
         - path:

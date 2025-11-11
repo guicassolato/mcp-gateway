@@ -9,8 +9,9 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcps
   hostnames:
-    - 'api-key-server.mcp.local' # note this is matching the gateway listener. It is purely for internal routing by Envoy
+    - api-key-mcp-server
   rules:
     - matches:
         - path:

@@ -9,8 +9,9 @@ spec:
     kind: Gateway
     name: mcp-gateway
     namespace: gateway-system
+    sectionName: mcps
   hostnames:
-  - custom-path.mcp.local
+  - custom-path-mcp-server
   rules:
   - matches:
     - path:
@@ -22,4 +23,3 @@ spec:
       name: mcp-custom-path-server
       namespace: mcp-test
       port: 8080
-

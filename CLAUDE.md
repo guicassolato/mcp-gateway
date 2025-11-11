@@ -154,8 +154,8 @@ MCPServer CRD has optional `path` field (defaults to `/mcp`):
 - Router sets `:path` header when path != `/mcp`
 
 **HTTPRoute Requirements**:
-- HTTPRoute must have a hostname that matches a Gateway listener
-- For internal services, use `*.mcp.local` pattern (matches wildcard listener)
+- HTTPRoute must specify `parentRefs.sectionName` to ensure it only attaches to the intended gateway listener
+- HTTPRoute referenced by the MCPServer resource must attach to the gateway listener used for internal routing
 - HTTPRoute should include path match for the custom path
 
 Example:
@@ -178,8 +178,13 @@ metadata:
   name: custom-path-route
   namespace: mcp-test
 spec:
+  parentRefs:
+  - kind: Gateway
+    name: mcp-gateway
+    namespace: gateway-system
+    sectionName: mcp-local
   hostnames:
-  - custom.mcp.local       # Must match Gateway listener
+  - custom.mcp.local
   rules:
   - matches:
     - path:

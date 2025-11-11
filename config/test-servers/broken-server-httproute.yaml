@@ -8,8 +8,9 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcps
   hostnames:
-    - "broken-server.mcp.local" #note this is matching the gateway listener. It is purely for internal routing by Envoy
+    - broken-mcp-server
   rules:
     - matches:
         - path:
