@@ -108,9 +108,9 @@ type MCPBroker interface {
 
 type mcpServers map[upstreamMCPURL]*upstreamMCP
 
-func (mcps mcpServers) findByHost(host string) *upstreamMCP {
+func (mcps mcpServers) findByName(name string) *upstreamMCP {
 	for _, mcp := range mcps {
-		if mcp.Hostname == host {
+		if mcp.Name == name {
 			return mcp
 		}
 	}
