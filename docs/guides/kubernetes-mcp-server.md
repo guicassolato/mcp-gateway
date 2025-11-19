@@ -7,7 +7,7 @@ The Kubernetes MCP server runs on the local machine alongside a Kubernetes Kind 
 This demo is part of a 3-use case series:
 
 1. [No auth](#use-case-1-no-auth) ✅
-2. [OIDC auth](#use-case-2-oidc-auth)
+2. [OIDC auth](#use-case-2-oidc-auth) ✅
 3. [Cross-domain auth](#use-case-3-cross-domain-auth)
 
 <br/>
