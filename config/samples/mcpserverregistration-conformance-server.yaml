@@ -9,7 +9,7 @@ metadata:
 spec:
   # toolPrefix: conformance_ # conformance test suite expects no prefix
   targetRef:
-    # MCP Conformance Server - Typescript SDK based conformance test server
+    # MCP Conformance Server - TypeScript SDK based conformance test server
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: conformance-server-route

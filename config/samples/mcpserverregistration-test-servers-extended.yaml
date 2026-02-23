@@ -77,7 +77,7 @@ metadata:
 spec:
   toolPrefix: everything_
   targetRef:
-    # MCP Everything Server - Typescript SDK based (prompts, tools, resources, sampling)
+    # MCP Everything Server - TypeScript SDK based (prompts, tools, resources, sampling)
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: everything-server-route
@@ -92,7 +92,7 @@ metadata:
 spec:
   toolPrefix: custom_resp_
   targetRef:
-    # MCP Everything Server - Typescript SDK based (prompts, tools, resources, sampling)
+    # MCP Everything Server - TypeScript SDK based (prompts, tools, resources, sampling)
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: mcp-custom-response-route
