@@ -145,16 +145,16 @@ spec:
     sectionName: team-a-external #ties this instance to port 8080
 ```
 
-#### Optional Spec Fields
+#### Spec Fields
 
 Some flags will also be able to be set via the `MCPGatewayExtension` resource if needed:
 
 ```yaml
 spec:
-  wildcardSubDomain: kuadrant
-  trustedHeadersKey: # will trigger mount of secret into gateway
-    secret:
-      name: trusted-headers-key
+  publicHost: kuadrant.mcp-gateway.mcp # overrides the default from the listener (example if it is a wildcard)
+  backendPingIntervalSeconds: 60 #how often the gateway connects and checks the backend MCP server
+  trustedHeadersKey: # will trigger mount of secret into gateway and generate a key pair to use
+    secretName: trusted-headers-key
     generate: true
 ```
 
@@ -239,10 +239,12 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
+- [ ] Add MCPGatewayExtension spec properties based on the definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
 - [ ] Add trusted-header key pair generation (optional feature)
 - [ ] Create migration guide for existing MCPGatewayExtensions
 - [ ] Implement HTTPRoute creation for gateway access
+
 
 ### Completed
 - [x] Filter MCPServerRegistration config by listener (only write config to extensions whose listener matches the HTTPRoute via sectionName or hostname)

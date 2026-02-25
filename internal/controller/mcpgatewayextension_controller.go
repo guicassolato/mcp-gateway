@@ -225,8 +225,8 @@ func (r *MCPGatewayExtensionReconciler) reconcileActive(ctx context.Context, mcp
 
 	// update Gateway listener status to indicate MCP Gateway is configured
 	if err := r.updateGatewayListenerStatus(ctx, mcpExt, targetGateway, listenerConfig); err != nil {
-		r.log.Error("failed to update gateway listener status", "error", err)
-		// don't fail reconciliation for status update errors
+		r.log.Error("failed to update gateway listener status, will retry", "error", err)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, r.updateStatus(ctx, mcpExt, metav1.ConditionTrue, mcpv1alpha1.ConditionReasonSuccess, "successfully verified and configured")
@@ -245,7 +245,7 @@ func (r *MCPGatewayExtensionReconciler) validateGatewayTarget(ctx context.Contex
 	// validate sectionName references an existing listener and namespace is allowed
 	listenerConfig, err := findListenerConfig(targetGateway, mcpExt.Spec.TargetRef.SectionName, mcpExt.Namespace)
 	if err != nil {
-		return nil, nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid, err.Error())
+		return nil, nil, err
 	}
 
 	// cross-namespace reference requires ReferenceGrant
@@ -277,8 +277,9 @@ func findListenerConfig(gateway *gatewayv1.Gateway, sectionName string, mcpExtNa
 		if string(listener.Name) == sectionName {
 			// validate that the MCPGatewayExtension namespace is allowed by the listener
 			if !listenerAllowsNamespace(&listener, mcpExtNamespace, gateway.Namespace) {
-				return nil, fmt.Errorf("invalid: listener %q on gateway %s/%s does not allow routes from namespace %q",
-					sectionName, gateway.Namespace, gateway.Name, mcpExtNamespace)
+				return nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+					fmt.Sprintf("listener %q on gateway %s/%s does not allow routes from namespace %q",
+						sectionName, gateway.Namespace, gateway.Name, mcpExtNamespace))
 			}
 
 			hostname := ""
@@ -295,7 +296,8 @@ func findListenerConfig(gateway *gatewayv1.Gateway, sectionName string, mcpExtNa
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("invalid: listener %q not found on gateway %s/%s", sectionName, gateway.Namespace, gateway.Name)
+	return nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+		fmt.Sprintf("listener %q not found on gateway %s/%s", sectionName, gateway.Namespace, gateway.Name))
 }
 
 // findListenerConfigByName finds listener configuration by name without namespace validation.
@@ -315,7 +317,8 @@ func findListenerConfigByName(gateway *gatewayv1.Gateway, sectionName string) (*
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("listener %q not found on gateway %s/%s", sectionName, gateway.Namespace, gateway.Name)
+	return nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+		fmt.Sprintf("listener %q not found on gateway %s/%s", sectionName, gateway.Namespace, gateway.Name))
 }
 
 // listenerAllowsNamespace checks if the listener's allowedRoutes configuration permits
@@ -473,12 +476,11 @@ func (r *MCPGatewayExtensionReconciler) updateGatewayListenerStatus(ctx context.
 		}
 	}
 
-	// if listener status doesn't exist, create it
+	// we don't own the gateway so we should not create listener status entries;
+	// return an error to requeue and wait for the gateway controller to create it
 	if listenerStatus == nil {
-		freshGateway.Status.Listeners = append(freshGateway.Status.Listeners, gatewayv1.ListenerStatus{
-			Name: listenerName,
-		})
-		listenerStatus = &freshGateway.Status.Listeners[len(freshGateway.Status.Listeners)-1]
+		return fmt.Errorf("listener status for %q not yet present on gateway %s/%s",
+			listenerConfig.Name, freshGateway.Namespace, freshGateway.Name)
 	}
 
 	envoyFilterName, envoyFilterNamespace := envoyFilterNameAndNamespace(mcpExt)
