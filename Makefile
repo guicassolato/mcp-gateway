@@ -395,11 +395,11 @@ golangci-lint:
 
 # To install cspell, do `npm install -g cspell@latest`.
 # If this reports "Unknown word" for valid spellings, do
-# `cspell --words-only --unique . | sort --ignore-case >> project-words.txt`
+# `cspell --words-only --config cspell.json --unique . | sort --ignore-case >> project-words.txt`
 # to add new words to the list.
 .PHONY: spell
 spell:
-	cspell --quiet --exclude "config/crd/istio/**" .
+	cspell --quiet --config cspell.json .
 
 .PHONY: lint
 lint: check-gofmt check-goimports check-newlines fmt vet golangci-lint spell ## Run all linting and style checks
