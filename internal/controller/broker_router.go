@@ -50,12 +50,12 @@ func brokerRouterLabels() map[string]string {
 	}
 }
 
-func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) *appsv1.Deployment {
+func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv1alpha1.MCPGatewayExtension, publicHost, internalHost string) *appsv1.Deployment {
 	labels := brokerRouterLabels()
 	replicas := int32(1)
 
 	command := []string{"./mcp_gateway", fmt.Sprintf("--mcp-broker-public-address=0.0.0.0:%d", brokerHTTPPort),
-		"--mcp-gateway-private-host=" + mcpExt.InternalHost(listenerConfig.Port),
+		"--mcp-gateway-private-host=" + internalHost,
 		"--mcp-gateway-config=/config/config.yaml"}
 	// annotation takes precedence over reconciler default
 	pollInterval := mcpExt.PollInterval()
@@ -69,8 +69,6 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 		}
 		command = append(command, "--mcp-check-interval="+pollInterval)
 	}
-	// derive public host from listener hostname, with annotation override for backwards compatibility
-	publicHost := derivePublicHost(listenerConfig, mcpExt.PublicHost())
 	command = append(command, "--mcp-gateway-public-host="+publicHost)
 	command = append(command, "--mcp-router-key="+routerKey(mcpExt))
 	return &appsv1.Deployment{
@@ -211,6 +209,13 @@ func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOver
 }
 
 func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) (bool, error) {
+	// derive values from listener config before building resources
+	publicHost := derivePublicHost(listenerConfig, mcpExt.PublicHost())
+	if publicHost == "" {
+		return false, fmt.Errorf("unable to derive public host: listener %q has no hostname and no public host annotation is set", listenerConfig.Name)
+	}
+	internalHost := mcpExt.InternalHost(listenerConfig.Port)
+
 	// reconcile service account (must exist before deployment)
 	serviceAccount := r.buildBrokerRouterServiceAccount(mcpExt)
 	if err := controllerutil.SetControllerReference(mcpExt, serviceAccount, r.Scheme); err != nil {
@@ -237,7 +242,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 	}
 
 	// reconcile deployment
-	deployment := r.buildBrokerRouterDeployment(mcpExt, listenerConfig)
+	deployment := r.buildBrokerRouterDeployment(mcpExt, publicHost, internalHost)
 	if err := controllerutil.SetControllerReference(mcpExt, deployment, r.Scheme); err != nil {
 		return false, fmt.Errorf("failed to set controller reference on deployment: %w", err)
 	}
@@ -293,31 +298,29 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 
 	// reconcile gateway HTTPRoute (unless disabled by annotation)
 	if !mcpExt.HTTPRouteDisabled() {
-		httpRoute := r.buildGatewayHTTPRoute(mcpExt, listenerConfig)
-		if httpRoute != nil {
-			if err := controllerutil.SetControllerReference(mcpExt, httpRoute, r.Scheme); err != nil {
-				return false, fmt.Errorf("failed to set controller reference on httproute: %w", err)
-			}
+		httpRoute := r.buildGatewayHTTPRoute(mcpExt, publicHost)
+		if err := controllerutil.SetControllerReference(mcpExt, httpRoute, r.Scheme); err != nil {
+			return false, fmt.Errorf("failed to set controller reference on httproute: %w", err)
+		}
 
-			existingHTTPRoute := &gatewayv1.HTTPRoute{}
-			err = r.Get(ctx, client.ObjectKeyFromObject(httpRoute), existingHTTPRoute)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
-					if err := r.Create(ctx, httpRoute); err != nil {
-						return false, fmt.Errorf("failed to create httproute: %w", err)
-					}
-				} else {
-					return false, fmt.Errorf("failed to get httproute: %w", err)
+		existingHTTPRoute := &gatewayv1.HTTPRoute{}
+		err = r.Get(ctx, client.ObjectKeyFromObject(httpRoute), existingHTTPRoute)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
+				if err := r.Create(ctx, httpRoute); err != nil {
+					return false, fmt.Errorf("failed to create httproute: %w", err)
 				}
-			} else if needsUpdate, reason := httpRouteNeedsUpdate(httpRoute, existingHTTPRoute); needsUpdate {
-				r.log.Info("updating gateway httproute", "namespace", mcpExt.Namespace, "reason", reason)
-				existingHTTPRoute.Spec.ParentRefs = httpRoute.Spec.ParentRefs
-				existingHTTPRoute.Spec.Hostnames = httpRoute.Spec.Hostnames
-				existingHTTPRoute.Spec.Rules = httpRoute.Spec.Rules
-				if err := r.Update(ctx, existingHTTPRoute); err != nil {
-					return false, fmt.Errorf("failed to update httproute: %w", err)
-				}
+			} else {
+				return false, fmt.Errorf("failed to get httproute: %w", err)
+			}
+		} else if needsUpdate, reason := httpRouteNeedsUpdate(httpRoute, existingHTTPRoute); needsUpdate {
+			r.log.Info("updating gateway httproute", "namespace", mcpExt.Namespace, "reason", reason)
+			existingHTTPRoute.Spec.ParentRefs = httpRoute.Spec.ParentRefs
+			existingHTTPRoute.Spec.Hostnames = httpRoute.Spec.Hostnames
+			existingHTTPRoute.Spec.Rules = httpRoute.Spec.Rules
+			if err := r.Update(ctx, existingHTTPRoute); err != nil {
+				return false, fmt.Errorf("failed to update httproute: %w", err)
 			}
 		}
 	}
@@ -398,12 +401,7 @@ func filterIgnoredFlags(command []string) []string {
 	return filtered
 }
 
-func (r *MCPGatewayExtensionReconciler) buildGatewayHTTPRoute(mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) *gatewayv1.HTTPRoute {
-	publicHost := derivePublicHost(listenerConfig, mcpExt.PublicHost())
-	if publicHost == "" {
-		return nil
-	}
-
+func (r *MCPGatewayExtensionReconciler) buildGatewayHTTPRoute(mcpExt *mcpv1alpha1.MCPGatewayExtension, publicHost string) *gatewayv1.HTTPRoute {
 	labels := brokerRouterLabels()
 	pathType := gatewayv1.PathMatchPathPrefix
 	pathValue := "/mcp"
