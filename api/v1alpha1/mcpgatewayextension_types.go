@@ -26,6 +26,9 @@ const (
 	AnnotationPollInterval = "kuadrant.io/alpha-gateway-poll-interval"
 	// AnnotationListenerPort specifies the Gateway listener port for the EnvoyFilter to target. Note this a temporary annotation and you should expect it to be removed in a future release
 	AnnotationListenerPort = "kuadrant.io/alpha-gateway-listener-port"
+	// AnnotationDisableHTTPRoute when set to "true" disables automatic HTTPRoute creation.
+	// Use this when you need to manage your own HTTPRoute (e.g. with CORS headers or custom filters).
+	AnnotationDisableHTTPRoute = "kuadrant.io/alpha-disable-httproute"
 
 	// DefaultListenerPort is the default port used when no annotation is specified
 	DefaultListenerPort = 8080
@@ -173,6 +176,14 @@ func (m *MCPGatewayExtension) ListenerPort() uint32 {
 		return DefaultListenerPort
 	}
 	return uint32(port)
+}
+
+// HTTPRouteDisabled returns true if the disable-httproute annotation is set to "true"
+func (m *MCPGatewayExtension) HTTPRouteDisabled() bool {
+	if m.Annotations == nil {
+		return false
+	}
+	return m.Annotations[AnnotationDisableHTTPRoute] == "true"
 }
 
 // ListenerConfig holds configuration extracted from a Gateway listener

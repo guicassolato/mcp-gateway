@@ -194,6 +194,62 @@ func toolsListMatches(toolsList *mcp.ListToolsResult, matcher func(string) bool)
 	return false
 }
 
+// HTTPRouteHasHostname checks if the HTTPRoute has the expected hostname
+func (v *Verifier) HTTPRouteHasHostname(name, namespace, expectedHostname string) error {
+	httpRoute, err := v.getHTTPRoute(name, namespace)
+	if err != nil {
+		return err
+	}
+	for _, hn := range httpRoute.Spec.Hostnames {
+		if string(hn) == expectedHostname {
+			return nil
+		}
+	}
+	return fmt.Errorf("HTTPRoute %s/%s does not have hostname %q, has %v", namespace, name, expectedHostname, httpRoute.Spec.Hostnames)
+}
+
+// HTTPRouteHasParentRef checks if the HTTPRoute has a parentRef to the expected gateway and sectionName
+func (v *Verifier) HTTPRouteHasParentRef(name, namespace, gatewayName, sectionName string) error {
+	httpRoute, err := v.getHTTPRoute(name, namespace)
+	if err != nil {
+		return err
+	}
+	for _, ref := range httpRoute.Spec.ParentRefs {
+		if string(ref.Name) == gatewayName {
+			if ref.SectionName != nil && string(*ref.SectionName) == sectionName {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("HTTPRoute %s/%s does not have parentRef to gateway %q with sectionName %q", namespace, name, gatewayName, sectionName)
+}
+
+// HTTPRouteHasOwnerReference checks if the HTTPRoute has an owner reference with the expected name
+func (v *Verifier) HTTPRouteHasOwnerReference(name, namespace, ownerName string) error {
+	httpRoute, err := v.getHTTPRoute(name, namespace)
+	if err != nil {
+		return err
+	}
+	for _, ref := range httpRoute.OwnerReferences {
+		if ref.Name == ownerName {
+			return nil
+		}
+	}
+	return fmt.Errorf("HTTPRoute %s/%s does not have owner reference %q", namespace, name, ownerName)
+}
+
+// HTTPRouteNotFound checks that an HTTPRoute does NOT exist
+func (v *Verifier) HTTPRouteNotFound(name, namespace string) error {
+	_, err := v.getHTTPRoute(name, namespace)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil
+		}
+		return err
+	}
+	return fmt.Errorf("HTTPRoute %s/%s exists but should not", namespace, name)
+}
+
 // Legacy function wrappers for backwards compatibility during migration
 // TODO: Remove these after updating all tests to use Verifier
 

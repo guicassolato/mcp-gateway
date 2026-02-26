@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/mark3labs/mcp-go/mcp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -175,7 +176,6 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 			TargetingGateway(E2E1GatewayName, GatewayNamespace).
 			WithSectionName(E2E1ListenerName).
 			WithPublicHost(E2E1PublicHost).
-			WithHTTPRoute().
 			Build()
 		e2e1Setup.Clean(ctx).Register(ctx)
 		defer e2e1Setup.TearDown(ctx)
@@ -287,7 +287,6 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 			TargetingGateway(E2E1GatewayName, GatewayNamespace).
 			WithSectionName(E2E1ListenerName).
 			WithPublicHost(E2E1PublicHost).
-			WithHTTPRoute().
 			Build()
 		e2e1Setup.Clean(ctx).Register(ctx)
 		defer e2e1Setup.TearDown(ctx)
@@ -447,7 +446,6 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 			TargetingGateway(SharedGatewayName, GatewayNamespace).
 			WithSectionName(TeamAMCPListenerName).
 			WithPublicHost(TeamAPublicHost).
-			WithHTTPRoute().
 			Build()
 		teamASetup.Clean(ctx).Register(ctx)
 		defer teamASetup.TearDown(ctx)
@@ -460,7 +458,6 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 			TargetingGateway(SharedGatewayName, GatewayNamespace).
 			WithSectionName(TeamBMCPListenerName).
 			WithPublicHost(TeamBPublicHost).
-			WithHTTPRoute().
 			Build()
 		teamBSetup.Clean(ctx).Register(ctx)
 		defer teamBSetup.TearDown(ctx)
@@ -646,5 +643,156 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 		GinkgoWriter.Println("Conflict MCPGatewayExtension status message:", msg)
 		// The message should indicate the namespace is not allowed by the listener's allowedRoutes
 		Expect(msg).To(Or(ContainSubstring("not allowed"), ContainSubstring("allowedRoutes"), ContainSubstring("conflict")))
+	})
+
+	It("[Happy] MCPGatewayExtension creates HTTPRoute for gateway access", func() {
+		const (
+			extName      = "httproute-test-ext"
+			extNamespace = "httproute-test"
+			routeName    = "mcp-gateway-route"
+		)
+
+		ctx := context.Background()
+
+		By("Setting up MCPGatewayExtension targeting e2e-1 gateway")
+		setup := NewMCPGatewayExtensionSetup(k8sClient).
+			WithName(extName).
+			InNamespace(extNamespace).
+			TargetingGateway(E2E1GatewayName, GatewayNamespace).
+			WithSectionName(E2E1ListenerName).
+			WithPublicHost(E2E1PublicHost).
+			Build()
+		setup.Clean(ctx).Register(ctx)
+		defer setup.TearDown(ctx)
+
+		By("Verifying MCPGatewayExtension becomes ready")
+		Eventually(func(g Gomega) {
+			err := VerifyMCPGatewayExtensionReady(ctx, k8sClient, extName, extNamespace)
+			g.Expect(err).NotTo(HaveOccurred())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		v := NewVerifier(ctx, k8sClient)
+
+		By("Verifying HTTPRoute is created with correct hostname")
+		Eventually(func(g Gomega) {
+			g.Expect(v.HTTPRouteHasHostname(routeName, extNamespace, E2E1PublicHost)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		By("Verifying HTTPRoute has correct parentRef with sectionName")
+		Expect(v.HTTPRouteHasParentRef(routeName, extNamespace, E2E1GatewayName, E2E1ListenerName)).To(Succeed())
+
+		By("Verifying HTTPRoute has owner reference to MCPGatewayExtension")
+		Expect(v.HTTPRouteHasOwnerReference(routeName, extNamespace, extName)).To(Succeed())
+	})
+
+	It("[Happy] MCPGatewayExtension with disable-httproute annotation skips HTTPRoute creation", func() {
+		const (
+			extName      = "no-httproute-ext"
+			extNamespace = "no-httproute-test"
+			routeName    = "mcp-gateway-route"
+		)
+
+		ctx := context.Background()
+
+		By("Setting up MCPGatewayExtension with disable-httproute annotation")
+		setup := NewMCPGatewayExtensionSetup(k8sClient).
+			WithName(extName).
+			InNamespace(extNamespace).
+			TargetingGateway(E2E1GatewayName, GatewayNamespace).
+			WithSectionName(E2E1ListenerName).
+			WithPublicHost(E2E1PublicHost).
+			Build()
+		setup.Clean(ctx).Register(ctx)
+		defer setup.TearDown(ctx)
+
+		By("Adding disable-httproute annotation")
+		ext := setup.GetExtension()
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ext), ext)).To(Succeed())
+			if ext.Annotations == nil {
+				ext.Annotations = map[string]string{}
+			}
+			ext.Annotations[mcpv1alpha1.AnnotationDisableHTTPRoute] = "true"
+			g.Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		By("Verifying MCPGatewayExtension becomes ready")
+		Eventually(func(g Gomega) {
+			err := VerifyMCPGatewayExtensionReady(ctx, k8sClient, extName, extNamespace)
+			g.Expect(err).NotTo(HaveOccurred())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		By("Verifying deployment is created (reconciliation proceeded)")
+		Eventually(func(g Gomega) {
+			deployment := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: "mcp-gateway", Namespace: extNamespace}, deployment)
+			g.Expect(err).NotTo(HaveOccurred())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		v := NewVerifier(ctx, k8sClient)
+
+		By("Verifying HTTPRoute does NOT exist")
+		Expect(v.HTTPRouteNotFound(routeName, extNamespace)).To(Succeed())
+	})
+
+	It("[multi-gateway] Each MCPGatewayExtension gets its own HTTPRoute", func() {
+		const (
+			teamAExtName = "httproute-team-a"
+			teamBExtName = "httproute-team-b"
+			routeName    = "mcp-gateway-route"
+		)
+
+		ctx := context.Background()
+
+		By("Setting up MCPGatewayExtension for Team A on shared-gateway")
+		teamASetup := NewMCPGatewayExtensionSetup(k8sClient).
+			WithName(teamAExtName).
+			InNamespace(TeamANamespace).
+			WithNamespaceLabels(map[string]string{TeamANamespaceLabel: TeamANamespaceValue}).
+			TargetingGateway(SharedGatewayName, GatewayNamespace).
+			WithSectionName(TeamAMCPListenerName).
+			WithPublicHost(TeamAPublicHost).
+			Build()
+		teamASetup.Clean(ctx).Register(ctx)
+		defer teamASetup.TearDown(ctx)
+
+		By("Setting up MCPGatewayExtension for Team B on shared-gateway")
+		teamBSetup := NewMCPGatewayExtensionSetup(k8sClient).
+			WithName(teamBExtName).
+			InNamespace(TeamBNamespace).
+			WithNamespaceLabels(map[string]string{TeamANamespaceLabel: TeamBNamespaceValue}).
+			TargetingGateway(SharedGatewayName, GatewayNamespace).
+			WithSectionName(TeamBMCPListenerName).
+			WithPublicHost(TeamBPublicHost).
+			Build()
+		teamBSetup.Clean(ctx).Register(ctx)
+		defer teamBSetup.TearDown(ctx)
+
+		By("Verifying both MCPGatewayExtensions become ready")
+		Eventually(func(g Gomega) {
+			g.Expect(VerifyMCPGatewayExtensionReady(ctx, k8sClient, teamAExtName, TeamANamespace)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		Eventually(func(g Gomega) {
+			g.Expect(VerifyMCPGatewayExtensionReady(ctx, k8sClient, teamBExtName, TeamBNamespace)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+
+		v := NewVerifier(ctx, k8sClient)
+
+		By("Verifying Team A HTTPRoute has correct hostname and parentRef")
+		Eventually(func(g Gomega) {
+			g.Expect(v.HTTPRouteHasHostname(routeName, TeamANamespace, TeamAPublicHost)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+		Expect(v.HTTPRouteHasParentRef(routeName, TeamANamespace, SharedGatewayName, TeamAMCPListenerName)).To(Succeed())
+
+		By("Verifying Team B HTTPRoute has correct hostname and parentRef")
+		Eventually(func(g Gomega) {
+			g.Expect(v.HTTPRouteHasHostname(routeName, TeamBNamespace, TeamBPublicHost)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).To(Succeed())
+		Expect(v.HTTPRouteHasParentRef(routeName, TeamBNamespace, SharedGatewayName, TeamBMCPListenerName)).To(Succeed())
+
+		By("Verifying each HTTPRoute is owned by its respective MCPGatewayExtension")
+		Expect(v.HTTPRouteHasOwnerReference(routeName, TeamANamespace, teamAExtName)).To(Succeed())
+		Expect(v.HTTPRouteHasOwnerReference(routeName, TeamBNamespace, teamBExtName)).To(Succeed())
 	})
 })

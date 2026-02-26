@@ -18,11 +18,13 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
 	// broker-router deployment constants
-	brokerRouterName = "mcp-gateway"
+	brokerRouterName     = "mcp-gateway"
+	gatewayHTTPRouteName = "mcp-gateway-route"
 
 	// DefaultBrokerRouterImage is the default image for the broker-router deployment
 	DefaultBrokerRouterImage = "ghcr.io/kuadrant/mcp-gateway:latest"
@@ -289,6 +291,37 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 		}
 	}
 
+	// reconcile gateway HTTPRoute (unless disabled by annotation)
+	if !mcpExt.HTTPRouteDisabled() {
+		httpRoute := r.buildGatewayHTTPRoute(mcpExt, listenerConfig)
+		if httpRoute != nil {
+			if err := controllerutil.SetControllerReference(mcpExt, httpRoute, r.Scheme); err != nil {
+				return false, fmt.Errorf("failed to set controller reference on httproute: %w", err)
+			}
+
+			existingHTTPRoute := &gatewayv1.HTTPRoute{}
+			err = r.Get(ctx, client.ObjectKeyFromObject(httpRoute), existingHTTPRoute)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
+					if err := r.Create(ctx, httpRoute); err != nil {
+						return false, fmt.Errorf("failed to create httproute: %w", err)
+					}
+				} else {
+					return false, fmt.Errorf("failed to get httproute: %w", err)
+				}
+			} else if needsUpdate, reason := httpRouteNeedsUpdate(httpRoute, existingHTTPRoute); needsUpdate {
+				r.log.Info("updating gateway httproute", "namespace", mcpExt.Namespace, "reason", reason)
+				existingHTTPRoute.Spec.ParentRefs = httpRoute.Spec.ParentRefs
+				existingHTTPRoute.Spec.Hostnames = httpRoute.Spec.Hostnames
+				existingHTTPRoute.Spec.Rules = httpRoute.Spec.Rules
+				if err := r.Update(ctx, existingHTTPRoute); err != nil {
+					return false, fmt.Errorf("failed to update httproute: %w", err)
+				}
+			}
+		}
+	}
+
 	// check deployment readiness
 	deploymentReady := existingDeployment.Status.ReadyReplicas > 0 &&
 		existingDeployment.Status.ReadyReplicas == existingDeployment.Status.Replicas
@@ -363,4 +396,78 @@ func filterIgnoredFlags(command []string) []string {
 		}
 	}
 	return filtered
+}
+
+func (r *MCPGatewayExtensionReconciler) buildGatewayHTTPRoute(mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) *gatewayv1.HTTPRoute {
+	publicHost := derivePublicHost(listenerConfig, mcpExt.PublicHost())
+	if publicHost == "" {
+		return nil
+	}
+
+	labels := brokerRouterLabels()
+	pathType := gatewayv1.PathMatchPathPrefix
+	pathValue := "/mcp"
+	port := gatewayv1.PortNumber(brokerHTTPPort)
+	gatewayNamespace := gatewayv1.Namespace(mcpExt.Spec.TargetRef.Namespace)
+	sectionName := gatewayv1.SectionName(mcpExt.Spec.TargetRef.SectionName)
+
+	return &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      gatewayHTTPRouteName,
+			Namespace: mcpExt.Namespace,
+			Labels:    labels,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1.CommonRouteSpec{
+				ParentRefs: []gatewayv1.ParentReference{
+					{
+						Group:       ptr.To(gatewayv1.Group("gateway.networking.k8s.io")),
+						Kind:        ptr.To(gatewayv1.Kind("Gateway")),
+						Name:        gatewayv1.ObjectName(mcpExt.Spec.TargetRef.Name),
+						Namespace:   &gatewayNamespace,
+						SectionName: &sectionName,
+					},
+				},
+			},
+			Hostnames: []gatewayv1.Hostname{
+				gatewayv1.Hostname(publicHost),
+			},
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					Matches: []gatewayv1.HTTPRouteMatch{
+						{
+							Path: &gatewayv1.HTTPPathMatch{
+								Type:  &pathType,
+								Value: &pathValue,
+							},
+						},
+					},
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: gatewayv1.ObjectName(brokerRouterName),
+									Port: &port,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// httpRouteNeedsUpdate checks if the HTTPRoute needs to be updated
+func httpRouteNeedsUpdate(desired, existing *gatewayv1.HTTPRoute) (bool, string) {
+	if !equality.Semantic.DeepEqual(desired.Spec.ParentRefs, existing.Spec.ParentRefs) {
+		return true, "parentRefs changed"
+	}
+	if !equality.Semantic.DeepEqual(desired.Spec.Hostnames, existing.Spec.Hostnames) {
+		return true, fmt.Sprintf("hostnames changed: %v -> %v", existing.Spec.Hostnames, desired.Spec.Hostnames)
+	}
+	if !equality.Semantic.DeepEqual(desired.Spec.Rules, existing.Spec.Rules) {
+		return true, "rules changed"
+	}
+	return false, ""
 }

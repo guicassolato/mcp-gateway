@@ -241,12 +241,13 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ### Todo
 - [ ] Add MCPGatewayExtension spec properties based on the definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
+- [ ] Update installation docs based on Generate OLM bundle being done
 - [ ] Add trusted-header key pair generation (optional feature)
 - [ ] Create migration guide for existing MCPGatewayExtensions
-- [ ] Implement HTTPRoute creation for gateway access
 
 
 ### Completed
+- [x] Implement HTTPRoute creation for gateway access
 - [x] Filter MCPServerRegistration config by listener (only write config to extensions whose listener matches the HTTPRoute via sectionName or hostname)
 - [x] Add MCPGatewayExtension reconcile (status, validation and resource creation)
 - [x] Add MCPGatewayExtension deletion handling (cleanup)

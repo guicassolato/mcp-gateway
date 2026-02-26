@@ -106,7 +106,6 @@ var _ = BeforeSuite(func() {
 		TargetingGateway(GatewayName, GatewayNamespace).
 		WithSectionName(GatewayListenerName).
 		WithPublicHost(gatewayPublicHost).
-		WithHTTPRoute().
 		Build()
 
 	defaultMCPGatewayExt.
