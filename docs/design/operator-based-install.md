@@ -239,11 +239,11 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
-- [ ] Add MCPGatewayExtension spec properties based on the definition here
+- [ ] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
 - [ ] Update installation docs based on Generate OLM bundle being done
 - [ ] Add trusted-header key pair generation (optional feature)
-- [ ] Create migration guide for existing MCPGatewayExtensions
+
 
 
 ### Completed
@@ -259,3 +259,4 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 - [x] Add listener status condition updates
 - [x] Update controller to read listener configuration to define mcp gateway flags
 - [x] Update documentation for sectionName requirement
+- [x] Create migration guide for existing MCPGatewayExtensions
