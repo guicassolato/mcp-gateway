@@ -134,6 +134,7 @@ This prevents resource waste during rapid development/force-pushing.
 ### Working ✅
 - MCP broker federates tools from multiple servers with prefixes
 - Controller discovers servers via HTTPRoutes and generates ConfigMap
+- MCPGatewayExtension controller auto-creates HTTPRoute (`mcp-gateway-route`) for gateway access; opt out with `kuadrant.io/alpha-disable-httproute: "true"` annotation
 - Authentication via Kubernetes secrets and env vars
 - Dynamic config updates via HTTP push API
 - Tool call forwarding to upstream servers

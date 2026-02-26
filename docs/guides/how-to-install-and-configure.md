@@ -62,6 +62,7 @@ This automatically installs:
 When the MCPGatewayExtension becomes ready, the controller automatically creates:
 - **MCP Broker/Router Deployment** - Aggregates tools from upstream MCP servers
 - **MCP Broker/Router Service** - Named `mcp-gateway` in the MCPGatewayExtension namespace
+- **HTTPRoute** - Named `mcp-gateway-route`, routes traffic from the Gateway listener to the broker service on `/mcp`. The hostname is derived from the listener (wildcards like `*.example.com` become `mcp.example.com`). Can be disabled with the `kuadrant.io/alpha-disable-httproute: "true"` annotation on the MCPGatewayExtension if you need a custom HTTPRoute (e.g. with CORS headers or additional path rules)
 - **EnvoyFilter** - Configures Istio to route requests through the external processor (created in the Gateway's namespace)
 - **ServiceAccount** - For the broker/router pods
 - **Configuration Secret** - `mcp-gateway-config` containing server configuration
@@ -88,11 +89,12 @@ The **configuration secret** only contains MCP server entries for MCPServerRegis
 
 ## Post-Installation Configuration
 
-After installation, you'll need to configure the gateway and connect your MCP servers:
+After installation, the controller automatically creates the HTTPRoute for gateway access. You can connect your MCP servers:
 
-1. **[Configure Gateway Listener and Route](./configure-mcp-gateway-listener-and-router.md)** - Set up traffic routing
-2. **[Register MCP Servers](./register-mcp-servers.md)** - Connect internal MCP servers
-3. **[Connect to External MCP Servers](./external-mcp-server.md)** - Connect to external APIs
+1. **[Register MCP Servers](./register-mcp-servers.md)** - Connect internal MCP servers
+2. **[Connect to External MCP Servers](./external-mcp-server.md)** - Connect to external APIs
+
+If you need to customize the HTTPRoute (e.g. add CORS headers), see [Configure Gateway Listener and Route](./configure-mcp-gateway-listener-and-router.md).
 
 ## Optional Configuration
 

@@ -1,7 +1,7 @@
 
 # Configure MCP Gateway Listener and Route
 
-This guide covers adding an MCP listener to your existing Gateway and creating an HTTPRoute to route traffic to the MCP Gateway broker.
+This guide covers adding an MCP listener to your existing Gateway. The controller automatically creates an HTTPRoute when the MCPGatewayExtension becomes ready. This guide also covers how to use a custom HTTPRoute if you need CORS headers or additional path rules.
 
 ## Prerequisites
 
@@ -38,54 +38,75 @@ spec:
 >   --set gateway.publicHost=mcp.127-0-0-1.sslip.io
 > ```
 
-## Step 2: Create HTTPRoute
+## Step 2: HTTPRoute (Automatic)
 
-Create an HTTPRoute to route MCP traffic to the broker:
+The MCPGatewayExtension controller automatically creates an HTTPRoute named `mcp-gateway-route` when the extension becomes ready. The HTTPRoute:
+- Routes `/mcp` traffic to the `mcp-gateway` broker service on port 8080
+- Uses the hostname from the Gateway listener (wildcards like `*.example.com` become `mcp.example.com`)
+- References the target Gateway with the correct `sectionName`
+- Is owned by the MCPGatewayExtension and cleaned up automatically on deletion
+
+Verify the HTTPRoute was created:
 
 ```bash
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: mcp-route
-  namespace: mcp-system
-spec:
-  parentRefs:
-    - name: your-gateway-name        # Change to your Gateway name
-      namespace: your-gateway-namespace  # Change to your Gateway namespace
-  hostnames:
-    - 'mcp.127-0-0-1.sslip.io'              # Match the Gateway listener hostname
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /mcp
-      filters:
-        - type: ResponseHeaderModifier
-          responseHeaderModifier:
-            add:
-              - name: Access-Control-Allow-Origin
-                value: "*"
-              - name: Access-Control-Allow-Methods
-                value: "GET, POST, PUT, DELETE, OPTIONS, HEAD"
-              - name: Access-Control-Allow-Headers
-                value: "Content-Type, Authorization, Accept, Origin, X-Requested-With"
-              - name: Access-Control-Max-Age
-                value: "3600"
-              - name: Access-Control-Allow-Credentials
-                value: "true"
-      backendRefs:
-        - name: mcp-gateway     # MCP Gateway broker service name
-          port: 8080
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /.well-known/oauth-protected-resource
-      backendRefs:
-        - name: mcp-gateway
-          port: 8080
-EOF
+kubectl get httproute mcp-gateway-route -n mcp-system
 ```
+
+### Custom HTTPRoute (Optional)
+
+If you need a custom HTTPRoute (e.g. with CORS headers, additional path rules, or OAuth well-known endpoints), disable automatic creation and manage your own:
+
+1. Add the annotation to your MCPGatewayExtension:
+   ```bash
+   kubectl annotate mcpgatewayextension -n mcp-system your-extension-name \
+     kuadrant.io/alpha-disable-httproute=true
+   ```
+
+2. Create your custom HTTPRoute:
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: HTTPRoute
+   metadata:
+     name: mcp-route
+     namespace: mcp-system
+   spec:
+     parentRefs:
+       - name: your-gateway-name
+         namespace: your-gateway-namespace
+     hostnames:
+       - 'mcp.127-0-0-1.sslip.io'
+     rules:
+       - matches:
+           - path:
+               type: PathPrefix
+               value: /mcp
+         filters:
+           - type: ResponseHeaderModifier
+             responseHeaderModifier:
+               add:
+                 - name: Access-Control-Allow-Origin
+                   value: "*"
+                 - name: Access-Control-Allow-Methods
+                   value: "GET, POST, PUT, DELETE, OPTIONS, HEAD"
+                 - name: Access-Control-Allow-Headers
+                   value: "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+                 - name: Access-Control-Max-Age
+                   value: "3600"
+                 - name: Access-Control-Allow-Credentials
+                   value: "true"
+         backendRefs:
+           - name: mcp-gateway
+             port: 8080
+       - matches:
+           - path:
+               type: PathPrefix
+               value: /.well-known/oauth-protected-resource
+         backendRefs:
+           - name: mcp-gateway
+             port: 8080
+   EOF
+   ```
 
 ## Step 3: Verify EnvoyFilter Configuration
 
