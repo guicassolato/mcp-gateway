@@ -186,7 +186,6 @@ deploy-gateway-instance-helm: install-crd ## Deploy only the broker/router (with
   --set envoyFilter.name=$(MCP_GATEWAY_NAMESPACE) \
   --set broker.checkInterval=10\
   --set gateway.publicHost=$(MCP_GATEWAY_HOST) \
-  --set httpRoute.create=true \
   --set gateway.nodePort.create=true \
   --set mcpGatewayExtension.gatewayRef.name=$(MCP_GATEWAY_NAME) \
   --set mcpGatewayExtension.gatewayRef.namespace=gateway-system

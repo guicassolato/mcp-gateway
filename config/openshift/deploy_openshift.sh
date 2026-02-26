@@ -48,7 +48,6 @@ helm upgrade -i mcp-controller oci://ghcr.io/kuadrant/charts/mcp-gateway \
   --set controller.enabled=true \
   --set broker.create=false \
   --set gateway.create=false \
-  --set httpRoute.create=false \
   --set mcpGatewayExtension.create=false \
   --set envoyFilter.create=false
 
@@ -64,7 +63,6 @@ helm upgrade -i mcp-gateway oci://ghcr.io/kuadrant/charts/mcp-gateway \
   --set gateway.namespace=$GATEWAY_NAMESPACE \
   --set gateway.publicHost="$MCP_GATEWAY_HOST" \
   --set gateway.internalHostPattern="*.mcp.local" \
-  --set httpRoute.create=true \
   --set mcpGatewayExtension.create=true \
   --set mcpGatewayExtension.gatewayRef.name=mcp-gateway \
   --set mcpGatewayExtension.gatewayRef.namespace=$GATEWAY_NAMESPACE \

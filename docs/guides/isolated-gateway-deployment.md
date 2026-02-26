@@ -99,7 +99,6 @@ helm upgrade -i mcp-controller ./charts/mcp-gateway \
   --create-namespace \
   --set controller.enabled=true \
   --set gateway.create=false \
-  --set httpRoute.create=false \
   --set mcpGatewayExtension.create=false \
   --set envoyFilter.create=false
 ```
@@ -125,7 +124,6 @@ helm upgrade -i team-a-mcp-gateway ./charts/mcp-gateway \
   --set gateway.namespace=gateway-system \
   --set gateway.publicHost="$TEAM_A_HOST" \
   --set gateway.internalHostPattern="*.team-a.mcp.local" \
-  --set httpRoute.create=true \
   --set mcpGatewayExtension.create=true \
   --set mcpGatewayExtension.gatewayRef.name=team-a-gateway \
   --set mcpGatewayExtension.gatewayRef.namespace=gateway-system \
@@ -135,12 +133,14 @@ helm upgrade -i team-a-mcp-gateway ./charts/mcp-gateway \
 
 The Helm chart creates:
 - Gateway resource in gateway-system namespace
-- HTTPRoute for the MCP endpoint
 - MCPGatewayExtension targeting the Gateway
 - ReferenceGrant in the Gateway namespace (for cross-namespace references)
+- EnvoyFilter to route traffic through the external processor
+
+The controller then automatically creates:
+- HTTPRoute for the MCP endpoint
 - Broker/Router deployment
 - Service for the broker
-- EnvoyFilter to route traffic through the external processor
 - ServiceAccount and RBAC
 - Config Secret for MCP server configuration
 
@@ -172,7 +172,6 @@ helm upgrade -i team-b-mcp-gateway ./charts/mcp-gateway \
   --set gateway.namespace=gateway-system \
   --set gateway.publicHost="$TEAM_B_HOST" \
   --set gateway.internalHostPattern="*.team-b.mcp.local" \
-  --set httpRoute.create=true \
   --set mcpGatewayExtension.create=true \
   --set mcpGatewayExtension.gatewayRef.name=team-b-gateway \
   --set mcpGatewayExtension.gatewayRef.namespace=gateway-system \
@@ -434,7 +433,6 @@ helm install team-a-mcp-gateway ./charts/mcp-gateway \
   --set gateway.name=team-a-gateway \
   --set gateway.namespace=gateway-system \
   --set gateway.publicHost="$TEAM_A_HOST" \
-  --set httpRoute.create=true \
   --set envoyFilter.create=true \
   --set envoyFilter.name=team-a-gateway \
   --set mcpGatewayExtension.create=false

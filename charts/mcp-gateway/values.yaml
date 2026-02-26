@@ -66,17 +66,6 @@ gateway:
       # NodePort for the status port (leave empty for auto-assignment)
       nodePort: null
 
-# HTTPRoute configuration
-httpRoute:
-  # Create an HTTPRoute resource for the MCP Gateway
-  create: false
-  # Gateway reference - the Gateway this HTTPRoute attaches to
-  gatewayRef:
-    # Name of the Gateway
-    name: mcp-gateway
-    # Namespace of the Gateway
-    namespace: gateway-system
-
 # MCPGatewayExtension configuration
 mcpGatewayExtension:
   # Create an MCPGatewayExtension resource

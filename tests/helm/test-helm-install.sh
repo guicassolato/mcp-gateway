@@ -95,7 +95,6 @@ info "running helm install"
     --set gateway.namespace=gateway-system \
     --set broker.create=true \
     --set controller.enabled=true \
-    --set httpRoute.create=true \
     --set gateway.nodePort.create=true \
     --set gateway.publicHost=mcp.127-0-0-1.sslip.io \
     --set mcpGatewayExtension.gatewayRef.name=mcp-gateway \

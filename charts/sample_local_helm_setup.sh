@@ -59,7 +59,7 @@ kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRAN
 kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server2-httproute-ext.yaml -n mcp-test
 
 # Install MCP Gateway using either local chart or remote OCI chart
-# The chart creates: Gateway, HTTPRoute, NodePort service, Broker, Controller, EnvoyFilter
+# The chart creates: Gateway, NodePort service, Broker, Controller, EnvoyFilter
 if [ "$USE_LOCAL_CHART" = "true" ]; then
     echo "Installing from local chart: ./charts/mcp-gateway/"
     helm install mcp-gateway ./charts/mcp-gateway/ \
@@ -73,7 +73,6 @@ if [ "$USE_LOCAL_CHART" = "true" ]; then
         --set gateway.nodePort.create=true \
         --set gateway.nodePort.mcpPort=30080 \
         --set envoyFilter.name=mcp-gateway \
-        --set httpRoute.create=true \
         --set mcpGatewayExtension.gatewayRef.name=mcp-gateway \
         --set mcpGatewayExtension.gatewayRef.namespace=gateway-system
 else
@@ -90,7 +89,6 @@ else
         --set gateway.nodePort.create=true \
         --set gateway.nodePort.mcpPort=30080 \
         --set envoyFilter.name=mcp-gateway \
-        --set httpRoute.create=true \
         --set mcpGatewayExtension.gatewayRef.name=mcp-gateway \
         --set mcpGatewayExtension.gatewayRef.namespace=gateway-system
 fi
