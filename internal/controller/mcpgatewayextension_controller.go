@@ -209,6 +209,10 @@ func (r *MCPGatewayExtensionReconciler) reconcileActive(ctx context.Context, mcp
 
 	deploymentReady, err := r.reconcileBrokerRouter(ctx, mcpExt, listenerConfig)
 	if err != nil {
+		var valErr *validationError
+		if errors.As(err, &valErr) {
+			return ctrl.Result{}, r.updateStatus(ctx, mcpExt, metav1.ConditionFalse, valErr.reason, valErr.message)
+		}
 		return ctrl.Result{}, err
 	}
 

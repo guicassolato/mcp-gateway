@@ -778,6 +778,18 @@ func TestDerivePublicHost(t *testing.T) {
 			annotationOverride: "specific.example.com",
 			want:               "specific.example.com",
 		},
+		{
+			name:               "strips port from annotation override",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "mcp.127-0-0-1.sslip.io:8001",
+			want:               "mcp.127-0-0-1.sslip.io",
+		},
+		{
+			name:               "annotation without port unchanged",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "mcp.127-0-0-1.sslip.io",
+			want:               "mcp.127-0-0-1.sslip.io",
+		},
 	}
 
 	for _, tt := range tests {

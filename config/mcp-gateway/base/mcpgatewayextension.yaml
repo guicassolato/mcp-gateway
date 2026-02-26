@@ -3,7 +3,7 @@ kind: MCPGatewayExtension
 metadata:
   name: mcp-gateway-extension
   annotations:
-    kuadrant.io/alpha-gateway-public-host: "mcp.127-0-0-1.sslip.io:8001"
+    kuadrant.io/alpha-gateway-public-host: "mcp.127-0-0-1.sslip.io"
 spec:
   targetRef:
     group: gateway.networking.k8s.io

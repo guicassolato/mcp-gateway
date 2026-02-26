@@ -189,13 +189,22 @@ func routerKey(mcpExt *mcpv1alpha1.MCPGatewayExtension) string {
 	return hex.EncodeToString(hash[:16])
 }
 
+// stripPort removes port suffix from a host string (e.g. "example.com:8001" -> "example.com")
+func stripPort(host string) string {
+	if i := strings.LastIndex(host, ":"); i != -1 {
+		return host[:i]
+	}
+	return host
+}
+
 // derivePublicHost determines the public host for the MCP Gateway.
 // Priority: annotation override > listener hostname > empty string
 // For wildcard hostnames (*.example.com), we use mcp.example.com as the default subdomain.
+// Any port suffix is stripped since HTTPRoute hostnames don't allow ports.
 func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOverride string) string {
 	// annotation takes precedence for backwards compatibility
 	if annotationOverride != "" {
-		return annotationOverride
+		return stripPort(annotationOverride)
 	}
 	if listenerConfig == nil || listenerConfig.Hostname == "" {
 		return ""
@@ -309,7 +318,8 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 			if apierrors.IsNotFound(err) {
 				r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
 				if err := r.Create(ctx, httpRoute); err != nil {
-					return false, fmt.Errorf("failed to create httproute: %w", err)
+					return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+						fmt.Sprintf("failed to create httproute: %v", err))
 				}
 			} else {
 				return false, fmt.Errorf("failed to get httproute: %w", err)
@@ -320,7 +330,8 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 			existingHTTPRoute.Spec.Hostnames = httpRoute.Spec.Hostnames
 			existingHTTPRoute.Spec.Rules = httpRoute.Spec.Rules
 			if err := r.Update(ctx, existingHTTPRoute); err != nil {
-				return false, fmt.Errorf("failed to update httproute: %w", err)
+				return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+					fmt.Sprintf("failed to update httproute: %v", err))
 			}
 		}
 	}
