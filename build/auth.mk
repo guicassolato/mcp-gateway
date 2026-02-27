@@ -15,7 +15,7 @@ auth-example-setup: cert-manager-install kuadrant-install keycloak-install ## Se
 	@echo "Prerequisites: make local-env-setup should be completed"
 	@echo ""
 	@echo "Step 1/5: Configuring OAuth environment variables..."
-	@kubectl set env deployment/mcp-broker-router \
+	@kubectl set env deployment/mcp-gateway \
 		OAUTH_RESOURCE_NAME="MCP Server" \
 		OAUTH_RESOURCE="http://mcp.127-0-0-1.sslip.io:8001/mcp" \
 		OAUTH_AUTHORIZATION_SERVERS="https://keycloak.127-0-0-1.sslip.io:8002/realms/mcp" \
@@ -30,7 +30,7 @@ auth-example-setup: cert-manager-install kuadrant-install keycloak-install ## Se
 	@echo ""
 	@echo "Step 3/5: Applying AuthPolicy configurations..."
 	@kubectl apply -k ./config/samples/oauth-token-exchange/
-	@kubectl get deployment/mcp-broker-router -n mcp-system -o yaml | \
+	@kubectl get deployment/mcp-gateway -n mcp-system -o yaml | \
 		bin/yq '.spec.template.spec.containers[0].env += [{"name":"TRUSTED_HEADER_PUBLIC_KEY","valueFrom":{"secretKeyRef":{"name":"trusted-headers-public-key","key":"key"}}}] | .spec.template.spec.containers[0].env |= unique_by(.name)' | \
 		kubectl apply -f -
 	@echo "✅ AuthPolicy configurations applied"

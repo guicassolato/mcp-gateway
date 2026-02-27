@@ -26,7 +26,7 @@ kubectl set env deployment/<release-name> -n <namespace> \
 If you deployed the gateway manifests directly:
 
 ```bash
-kubectl set env deployment/mcp-broker-router -n mcp-system \
+kubectl set env deployment/mcp-gateway -n mcp-system \
   OTEL_EXPORTER_OTLP_ENDPOINT="http://your-collector:4318" \
   OTEL_EXPORTER_OTLP_INSECURE="true"
 ```
@@ -71,7 +71,7 @@ When using `http://`, TLS is automatically disabled regardless of the `OTEL_EXPO
 Use signal-specific endpoint overrides to route traces and logs to different collectors or backends:
 
 ```bash
-kubectl set env deployment/mcp-broker-router -n mcp-system \
+kubectl set env deployment/mcp-gateway -n mcp-system \
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://traces-collector:4318" \
   OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="http://logs-collector:4318" \
   OTEL_EXPORTER_OTLP_INSECURE="true"
