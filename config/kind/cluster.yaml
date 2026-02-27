@@ -44,3 +44,9 @@ nodes:
   - containerPort: 30474 # shared-gateway team-b
     hostPort: 8006
     protocol: TCP
+  - containerPort: 30475 # demo team-a
+    hostPort: 8007
+    protocol: TCP
+  - containerPort: 30476 # demo team-b
+    hostPort: 8008
+    protocol: TCP
