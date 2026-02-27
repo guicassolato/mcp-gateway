@@ -135,7 +135,7 @@ When no endpoint is configured, OTel is completely disabled (zero overhead).
 ### Manual Configuration (without make targets)
 
 ```bash
-kubectl set env deployment/mcp-broker-router -n mcp-system \
+kubectl set env deployment/mcp-gateway -n mcp-system \
   OTEL_EXPORTER_OTLP_ENDPOINT="http://your-collector:4318" \
   OTEL_EXPORTER_OTLP_INSECURE="true"
 ```

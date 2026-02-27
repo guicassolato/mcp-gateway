@@ -606,9 +606,9 @@ ifeq ($(ISTIO_TRACING),1)
 		-p='{"spec":{"values":{"meshConfig":{"enableTracing":true,"defaultConfig":{"tracing":{}},"extensionProviders":[{"name":"tempo-otlp","opentelemetry":{"port":4317,"service":"$(OTEL_COLLECTOR_HOST)"}}]}}}}'
 	@sleep 5
 endif
-	kubectl set env deployment/mcp-broker-router -n mcp-system \
+	kubectl set env deployment/mcp-gateway -n mcp-system \
 		OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_COLLECTOR_HTTP)" OTEL_EXPORTER_OTLP_INSECURE="true"
-	@kubectl rollout status deployment/mcp-broker-router -n mcp-system --timeout=120s
+	@kubectl rollout status deployment/mcp-gateway -n mcp-system --timeout=120s
 ifeq ($(AUTH_TRACING),1)
 	@if ! kubectl get authorino -n kuadrant-system 2>/dev/null | grep -q authorino; then \
 		$(MAKE) auth-example-setup; \

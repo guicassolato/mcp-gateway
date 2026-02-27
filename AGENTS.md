@@ -67,7 +67,7 @@ ginkgo run -v --tags=e2e --focus="test description" tests/e2e/
 
 ### E2E Test Reliability
 - Tests use broker `/status` endpoint for reliable server registration checks (not log parsing)
-- Port-forwards target deployments directly: `deployment/mcp-broker-router`
+- Port-forwards target deployments directly: `deployment/mcp-gateway`
 - Tests clean up existing resources before creating to avoid conflicts
 - Structured JSON responses provide better debugging when tests fail
 
@@ -390,10 +390,10 @@ spec:
 ### Testing
 ```bash
 # Verify tools are discovered
-kubectl logs -n mcp-system deploy/mcp-broker-router | grep "Discovered.*tools"
+kubectl logs -n mcp-system deploy/mcp-gateway | grep "Discovered.*tools"
 # Should show: "Discovered tools mcpURL=https://api.githubcopilot.com:443/mcp #tools=94"
 
 # Check auth header is added
-kubectl logs -n mcp-system deploy/mcp-broker-router | grep "Adding Authorization header"
+kubectl logs -n mcp-system deploy/mcp-gateway | grep "Adding Authorization header"
 # Should show: "Adding Authorization header for routing server=mcp-test/github-mcp"
 ```
