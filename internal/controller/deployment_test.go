@@ -905,6 +905,7 @@ func TestListenerAllowsNamespace(t *testing.T) {
 		listener         *gatewayv1.Listener
 		namespace        string
 		gatewayNamespace string
+		nsLabels         map[string]string
 		want             bool
 	}{
 		{
@@ -970,7 +971,43 @@ func TestListenerAllowsNamespace(t *testing.T) {
 			want:             true,
 		},
 		{
-			name: "Selector allows (we accept it since proper validation requires API calls)",
+			name: "Selector matches namespace labels",
+			listener: &gatewayv1.Listener{
+				Name: "test",
+				AllowedRoutes: &gatewayv1.AllowedRoutes{
+					Namespaces: &gatewayv1.RouteNamespaces{
+						From: &selectorNamespace,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+				},
+			},
+			namespace:        "any-ns",
+			gatewayNamespace: "gateway-ns",
+			nsLabels:         map[string]string{"env": "prod", "team": "backend"},
+			want:             true,
+		},
+		{
+			name: "Selector does not match namespace labels",
+			listener: &gatewayv1.Listener{
+				Name: "test",
+				AllowedRoutes: &gatewayv1.AllowedRoutes{
+					Namespaces: &gatewayv1.RouteNamespaces{
+						From: &selectorNamespace,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+				},
+			},
+			namespace:        "any-ns",
+			gatewayNamespace: "gateway-ns",
+			nsLabels:         map[string]string{"env": "staging"},
+			want:             false,
+		},
+		{
+			name: "Selector with nil selector rejects",
 			listener: &gatewayv1.Listener{
 				Name: "test",
 				AllowedRoutes: &gatewayv1.AllowedRoutes{
@@ -981,7 +1018,7 @@ func TestListenerAllowsNamespace(t *testing.T) {
 			},
 			namespace:        "any-ns",
 			gatewayNamespace: "gateway-ns",
-			want:             true,
+			want:             false,
 		},
 		{
 			name: "nil From defaults to Same",
@@ -1001,7 +1038,7 @@ func TestListenerAllowsNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := listenerAllowsNamespace(tt.listener, tt.namespace, tt.gatewayNamespace)
+			got := listenerAllowsNamespace(tt.listener, tt.namespace, tt.gatewayNamespace, tt.nsLabels)
 			if got != tt.want {
 				t.Errorf("listenerAllowsNamespace() = %v, want %v", got, tt.want)
 			}
@@ -1053,24 +1090,6 @@ func TestBuildGatewayHTTPRoute(t *testing.T) {
 			},
 			publicHost:     "mcp.example.com",
 			expectHostname: "mcp.example.com",
-		},
-		{
-			name: "override hostname",
-			mcpExt: &mcpv1alpha1.MCPGatewayExtension{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "test-ns",
-				},
-				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
-					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
-						Name:        "my-gateway",
-						Namespace:   "gateway-ns",
-						SectionName: "mcp",
-					},
-				},
-			},
-			publicHost:     "override.example.com",
-			expectHostname: "override.example.com",
 		},
 	}
 

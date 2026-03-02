@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -118,6 +119,7 @@ type MCPGatewayExtensionReconciler struct {
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=referencegrants,verbs=list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
@@ -247,10 +249,35 @@ func (r *MCPGatewayExtensionReconciler) validateGatewayTarget(ctx context.Contex
 		return nil, nil, err
 	}
 
-	// validate sectionName references an existing listener and namespace is allowed
-	listenerConfig, err := findListenerConfig(targetGateway, mcpExt.Spec.TargetRef.SectionName, mcpExt.Namespace)
+	// validate sectionName references an existing listener
+	listenerConfig, err := findListenerConfigByName(targetGateway, mcpExt.Spec.TargetRef.SectionName)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// a resolvable hostname is required: either the listener must have one or the public host annotation must be set
+	if listenerConfig.Hostname == "" && mcpExt.PublicHost() == "" {
+		return nil, nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+			fmt.Sprintf("listener %q on gateway %s/%s has no hostname and no %s annotation is set",
+				mcpExt.Spec.TargetRef.SectionName, targetGateway.Namespace, targetGateway.Name, mcpv1alpha1.AnnotationPublicHost))
+	}
+
+	// fetch the namespace so we can check selector-based listener allowedRoutes
+	ns := &corev1.Namespace{}
+	if err := r.Get(ctx, types.NamespacedName{Name: mcpExt.Namespace}, ns); err != nil {
+		return nil, nil, fmt.Errorf("failed to get namespace %s: %w", mcpExt.Namespace, err)
+	}
+
+	// validate that the MCPGatewayExtension namespace is allowed by the listener
+	for _, listener := range targetGateway.Spec.Listeners {
+		if string(listener.Name) == mcpExt.Spec.TargetRef.SectionName {
+			if !listenerAllowsNamespace(&listener, mcpExt.Namespace, targetGateway.Namespace, ns.Labels) {
+				return nil, nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
+					fmt.Sprintf("listener %q on gateway %s/%s does not allow routes from namespace %q",
+						mcpExt.Spec.TargetRef.SectionName, targetGateway.Namespace, targetGateway.Name, mcpExt.Namespace))
+			}
+			break
+		}
 	}
 
 	// cross-namespace reference requires ReferenceGrant
@@ -275,38 +302,7 @@ func (r *MCPGatewayExtensionReconciler) validateGatewayTarget(ctx context.Contex
 	return targetGateway, listenerConfig, nil
 }
 
-// findListenerConfig finds the listener configuration for a given sectionName on the Gateway
-// and validates that the MCPGatewayExtension's namespace is allowed by the listener's allowedRoutes
-func findListenerConfig(gateway *gatewayv1.Gateway, sectionName string, mcpExtNamespace string) (*mcpv1alpha1.ListenerConfig, error) {
-	for _, listener := range gateway.Spec.Listeners {
-		if string(listener.Name) == sectionName {
-			// validate that the MCPGatewayExtension namespace is allowed by the listener
-			if !listenerAllowsNamespace(&listener, mcpExtNamespace, gateway.Namespace) {
-				return nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
-					fmt.Sprintf("listener %q on gateway %s/%s does not allow routes from namespace %q",
-						sectionName, gateway.Namespace, gateway.Name, mcpExtNamespace))
-			}
-
-			hostname := ""
-			if listener.Hostname != nil {
-				hostname = string(*listener.Hostname)
-			}
-			// Gateway API uses int32 for port, but port numbers are always positive (1-65535)
-			// so this conversion is safe. The #nosec directive suppresses the gosec G115 warning.
-			port := uint32(listener.Port) // #nosec G115
-			return &mcpv1alpha1.ListenerConfig{
-				Port:     port,
-				Hostname: hostname,
-				Name:     sectionName,
-			}, nil
-		}
-	}
-	return nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
-		fmt.Sprintf("listener %q not found on gateway %s/%s", sectionName, gateway.Namespace, gateway.Name))
-}
-
-// findListenerConfigByName finds listener configuration by name without namespace validation.
-// Used for conflict detection where we only need the port number.
+// findListenerConfigByName finds listener configuration by name.
 func findListenerConfigByName(gateway *gatewayv1.Gateway, sectionName string) (*mcpv1alpha1.ListenerConfig, error) {
 	for _, listener := range gateway.Spec.Listeners {
 		if string(listener.Name) == sectionName {
@@ -331,7 +327,8 @@ func findListenerConfigByName(gateway *gatewayv1.Gateway, sectionName string) (*
 // - "All": allows routes from all namespaces
 // - "Same": allows routes only from the Gateway's namespace (default if not specified)
 // - "Selector": allows routes from namespaces matching the label selector
-func listenerAllowsNamespace(listener *gatewayv1.Listener, namespace, gatewayNamespace string) bool {
+// nsLabels are the labels on the namespace being checked.
+func listenerAllowsNamespace(listener *gatewayv1.Listener, namespace, gatewayNamespace string, nsLabels map[string]string) bool {
 	// if allowedRoutes is not specified, default behavior is "Same" namespace
 	if listener.AllowedRoutes == nil || listener.AllowedRoutes.Namespaces == nil {
 		return namespace == gatewayNamespace
@@ -350,12 +347,14 @@ func listenerAllowsNamespace(listener *gatewayv1.Listener, namespace, gatewayNam
 	case gatewayv1.NamespacesFromSame:
 		return namespace == gatewayNamespace
 	case gatewayv1.NamespacesFromSelector:
-		// for selector-based matching, we would need to fetch the namespace
-		// and check labels. For now, we'll accept it as we can't easily
-		// validate without additional API calls. The Gateway controller
-		// will ultimately enforce this anyway.
-		// TODO: implement proper selector-based validation
-		return true
+		if namespaces.Selector == nil {
+			return false
+		}
+		selector, err := metav1.LabelSelectorAsSelector(namespaces.Selector)
+		if err != nil {
+			return false
+		}
+		return selector.Matches(labels.Set(nsLabels))
 	case gatewayv1.NamespacesFromNone:
 		// no routes allowed from any namespace
 		return false
