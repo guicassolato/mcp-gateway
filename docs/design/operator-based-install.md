@@ -53,7 +53,7 @@ As part of this work, we will add a requirement to set the `sectionName` propert
     sectionName: team-a-external
 ```
 
-The addition of sectionName allows for the following improvements:
+The MCPGatewayExtension currently targets a gateway, but this is a little misleading. It really is configuring the router for a given port. So the addition of sectionName allows for the following improvements:
 
 1) It will better inform the operator which listener port the ext_proc router should listen to for MCP requests, allowing the operator to manage the configuration of the EnvoyFilter directly rather than requiring the user to do it. This will reduce the potential for misconfiguration.
 2) Allow the operator to discover additional configuration based on the gateway configuration and apply it to the router component, such as the public host to allow requests from removing the need for a user to set this manually.
@@ -63,6 +63,7 @@ This change will mean you can have a gateway instance per unique port rather tha
 
 - It will no longer be invalid to target a single gateway with multiple MCPGatewayExtensions. It will become invalid to have multiple extensions target listeners that share a port number.
 - During the reconcile the port for the targeted listener will be read. Valid MCP configuration for a gateway instance targeting that listener will be based on the listener configuration (port number and hostnames).
+- When reconciling an MCPServerRegistration, the controller will only write config to MCPGatewayExtension namespaces whose targeted listener matches the HTTPRoute. Matching is determined by the HTTPRoute's parentRef sectionName resolving to a listener on the same port, or by the HTTPRoute's hostnames matching the listener's hostname pattern (including wildcards). This ensures team isolation when sharing a gateway — each team's broker only receives config for MCP servers attached to its listener.
 
 #### Example Configuration
 
@@ -144,16 +145,16 @@ spec:
     sectionName: team-a-external #ties this instance to port 8080
 ```
 
-#### Optional Spec Fields
+#### Spec Fields
 
 Some flags will also be able to be set via the `MCPGatewayExtension` resource if needed:
 
 ```yaml
 spec:
-  wildcardSubDomain: kuadrant
-  trustedHeadersKey: # will trigger mount of secret into gateway
-    secret:
-      name: trusted-headers-key
+  publicHost: kuadrant.mcp-gateway.mcp # overrides the default from the listener (example if it is a wildcard)
+  backendPingIntervalSeconds: 60 #how often the gateway connects and checks the backend MCP server
+  trustedHeadersKey: # will trigger mount of secret into gateway and generate a key pair to use
+    secretName: trusted-headers-key
     generate: true
 ```
 
@@ -195,6 +196,16 @@ We currently update the status of the HTTPRoute. We will extend this to update t
         type: MCPGatewayExtension
 ```
 
+So each targeted listener will have a new condition under the gateway `status.listeners` with the above condition added.
+
+>Note: why are we updating the gateway's status?
+
+We are using the conditions to represent the state and communicate to others what is integrating with that gateway. This comes from the [api-conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status)
+
+```
+Objects may report multiple conditions, and new types of conditions may be added in the future or by 3rd party controllers. Therefore, conditions are represented using a list/slice of objects, where each condition has a similar structure. This collection should be treated as a map with a key of type.
+```
+
 ### Security Considerations
 
 #### EnvoyFilter Creation
@@ -228,19 +239,22 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
+- [ ] Add MCPGatewayExtension spec properties based on the definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
-- [ ] Add listener status condition updates
 - [ ] Add trusted-header key pair generation (optional feature)
-- [ ] Update documentation for sectionName requirement
 - [ ] Create migration guide for existing MCPGatewayExtensions
-- [ ] Add sectionName to MCPGatewayExtension targetRef
-- [ ] Update controller to read listener configuration
 - [ ] Implement HTTPRoute creation for gateway access
 
+
 ### Completed
+- [x] Filter MCPServerRegistration config by listener (only write config to extensions whose listener matches the HTTPRoute via sectionName or hostname)
 - [x] Add MCPGatewayExtension reconcile (status, validation and resource creation)
 - [x] Add MCPGatewayExtension deletion handling (cleanup)
 - [x] Implement deployment/service resource creation in MCPGatewayExtension reconciler
 - [x] Implement EnvoyFilter generation in MCPGatewayExtension reconciler
 - [x] Create e2e tests and infrastructure
 - [x] Update helm templates to reflect the new operator deployment
+- [x] Add sectionName to MCPGatewayExtension targetRef
+- [x] Add listener status condition updates
+- [x] Update controller to read listener configuration to define mcp gateway flags
+- [x] Update documentation for sectionName requirement

@@ -477,8 +477,10 @@ type MCPGatewayExtensionSetup struct {
 	k8sClient        client.Client
 	name             string
 	namespace        string
+	namespaceLabels  map[string]string
 	gatewayName      string
 	gatewayNamespace string
+	sectionName      string
 	publicHost       string
 	pollInterval     string
 	extension        *mcpv1alpha1.MCPGatewayExtension
@@ -512,6 +514,13 @@ func (s *MCPGatewayExtensionSetup) InNamespace(namespace string) *MCPGatewayExte
 	return s
 }
 
+// WithNamespaceLabels sets labels to apply to the namespace when created
+// This is useful for Gateway listeners with allowedRoutes.namespaces.from: Selector
+func (s *MCPGatewayExtensionSetup) WithNamespaceLabels(labels map[string]string) *MCPGatewayExtensionSetup {
+	s.namespaceLabels = labels
+	return s
+}
+
 // TargetingGateway sets the target Gateway
 func (s *MCPGatewayExtensionSetup) TargetingGateway(name, namespace string) *MCPGatewayExtensionSetup {
 	s.gatewayName = name
@@ -528,6 +537,12 @@ func (s *MCPGatewayExtensionSetup) WithPublicHost(host string) *MCPGatewayExtens
 // WithPollInterval sets the poll interval annotation
 func (s *MCPGatewayExtensionSetup) WithPollInterval(interval string) *MCPGatewayExtensionSetup {
 	s.pollInterval = interval
+	return s
+}
+
+// WithSectionName sets the sectionName (listener name) to target on the Gateway
+func (s *MCPGatewayExtensionSetup) WithSectionName(sectionName string) *MCPGatewayExtensionSetup {
+	s.sectionName = sectionName
 	return s
 }
 
@@ -558,10 +573,11 @@ func (s *MCPGatewayExtensionSetup) Build() *MCPGatewayExtensionSetup {
 		},
 		Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
 			TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
-				Group:     "gateway.networking.k8s.io",
-				Kind:      "Gateway",
-				Name:      s.gatewayName,
-				Namespace: s.gatewayNamespace,
+				Group:       "gateway.networking.k8s.io",
+				Kind:        "Gateway",
+				Name:        s.gatewayName,
+				Namespace:   s.gatewayNamespace,
+				SectionName: s.sectionName,
 			},
 		},
 	}
@@ -705,14 +721,18 @@ func (s *MCPGatewayExtensionSetup) Register(ctx context.Context) *MCPGatewayExte
 		if client.IgnoreNotFound(err) != nil {
 			Expect(err).ToNot(HaveOccurred())
 		}
-		// create namespace
+		// create namespace with labels (e2e label + any custom labels)
+		labels := map[string]string{"e2e": "test"}
+		for k, v := range s.namespaceLabels {
+			labels[k] = v
+		}
 		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   s.namespace,
-				Labels: map[string]string{"e2e": "test"},
+				Labels: labels,
 			},
 		}
-		GinkgoWriter.Printf("Creating namespace %s\n", s.namespace)
+		GinkgoWriter.Printf("Creating namespace %s with labels %v\n", s.namespace, labels)
 		Expect(s.k8sClient.Create(ctx, ns)).To(Succeed())
 		s.createdNamespace = true
 	}
@@ -794,6 +814,7 @@ type MCPGatewayExtensionBuilder struct {
 	namespace       string
 	targetGateway   string
 	targetNamespace string
+	sectionName     string
 }
 
 // NewMCPGatewayExtensionBuilder creates a new MCPGatewayExtensionBuilder
@@ -811,6 +832,12 @@ func (b *MCPGatewayExtensionBuilder) WithTarget(gatewayName, gatewayNamespace st
 	return b
 }
 
+// WithSectionName sets the sectionName (listener name) to target on the Gateway
+func (b *MCPGatewayExtensionBuilder) WithSectionName(sectionName string) *MCPGatewayExtensionBuilder {
+	b.sectionName = sectionName
+	return b
+}
+
 // Build creates the MCPGatewayExtension resource
 func (b *MCPGatewayExtensionBuilder) Build() *mcpv1alpha1.MCPGatewayExtension {
 	return &mcpv1alpha1.MCPGatewayExtension{
@@ -821,10 +848,11 @@ func (b *MCPGatewayExtensionBuilder) Build() *mcpv1alpha1.MCPGatewayExtension {
 		},
 		Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
 			TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
-				Group:     "gateway.networking.k8s.io",
-				Kind:      "Gateway",
-				Name:      b.targetGateway,
-				Namespace: b.targetNamespace,
+				Group:       "gateway.networking.k8s.io",
+				Kind:        "Gateway",
+				Name:        b.targetGateway,
+				Namespace:   b.targetNamespace,
+				SectionName: b.sectionName,
 			},
 		},
 	}

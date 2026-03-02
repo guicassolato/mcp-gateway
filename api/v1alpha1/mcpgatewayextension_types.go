@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -88,7 +89,7 @@ type MCPGatewayExtensionList struct {
 	Items           []MCPGatewayExtension `json:"items"`
 }
 
-// MCPGatewayExtensionTargetReference identifies an HTTPRoute that points to MCP servers.
+// MCPGatewayExtensionTargetReference identifies a Gateway listener to extend with MCP protocol support.
 // It follows Gateway API patterns for cross-resource references.
 type MCPGatewayExtensionTargetReference struct {
 	// Group is the group of the target resource.
@@ -107,6 +108,14 @@ type MCPGatewayExtensionTargetReference struct {
 	// Namespace of the target resource (optional, defaults to same namespace)
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
+
+	// SectionName is the name of a listener on the target Gateway. The controller will
+	// read the listener's port and hostname to configure the MCP Gateway instance.
+	// This allows multiple MCPGatewayExtensions to target different listeners on the
+	// same Gateway, each with their own MCP Gateway instance.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	SectionName string `json:"sectionName"`
 }
 
 func init() {
@@ -133,12 +142,12 @@ func (m *MCPGatewayExtension) PublicHost() string {
 }
 
 // InternalHost returns the internal/private host computed from the targetRef
-func (m *MCPGatewayExtension) InternalHost() string {
+func (m *MCPGatewayExtension) InternalHost(port uint32) string {
 	gatewayNamespace := m.Spec.TargetRef.Namespace
 	if gatewayNamespace == "" {
 		gatewayNamespace = m.Namespace
 	}
-	return m.Spec.TargetRef.Name + "-istio." + gatewayNamespace + ".svc.cluster.local:8080"
+	return fmt.Sprintf(m.Spec.TargetRef.Name+"-istio."+gatewayNamespace+".svc.cluster.local:%v", port)
 }
 
 // PollInterval returns the upstream MCP server ping interval from annotations, or empty string if not set
@@ -150,6 +159,7 @@ func (m *MCPGatewayExtension) PollInterval() string {
 }
 
 // ListenerPort returns the Gateway listener port from annotations, or DefaultListenerPort if not set or invalid
+// Deprecated: Use ListenerConfig from the Gateway instead
 func (m *MCPGatewayExtension) ListenerPort() uint32 {
 	if m.Annotations == nil {
 		return DefaultListenerPort
@@ -163,4 +173,14 @@ func (m *MCPGatewayExtension) ListenerPort() uint32 {
 		return DefaultListenerPort
 	}
 	return uint32(port)
+}
+
+// ListenerConfig holds configuration extracted from a Gateway listener
+type ListenerConfig struct {
+	// Port is the port number from the Gateway listener
+	Port uint32
+	// Hostname is the hostname from the Gateway listener (may be empty or a wildcard)
+	Hostname string
+	// Name is the listener name (sectionName)
+	Name string
 }
