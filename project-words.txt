@@ -170,6 +170,7 @@ hostnames
 htmlcov
 httproute
 httproutes
+idmap
 ingester
 ingressgateway
 inmemory
