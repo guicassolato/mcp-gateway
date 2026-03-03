@@ -81,7 +81,7 @@ MCP servers can require authentication:
    - Without this label, the MCPServerRegistration will fail validation
 2. Controller aggregates credentials into `mcp-aggregated-credentials` secret
 3. Broker receives via environment variables: `KAGENTI_{NAME}_CRED`
-4. Router adds Authorization header to Envoy routing instructions
+4. Router passes through client headers (including any Authorization header) during session initialization
 
 Example credential secret:
 ```yaml
@@ -111,10 +111,4 @@ The system handles credential updates automatically:
 This is a Kubernetes limitation - volume mounts sync every 60s by default and cannot be configured lower.
 
 ### OAuth + API Key Conflict (Issue #201)
-**Problem**: When using AuthPolicy (e.g., Kuadrant/Authorino), there's a timing issue where ext_proc runs FIRST and AuthPolicy runs SECOND. If ext_proc replaces the OAuth token with an API key, AuthPolicy fails.
-
-**Solution**: The router now sets both headers:
-- `x-mcp-api-key`: Backend API key (always set when credentials exist)
-- `authorization`: Only set if no existing Authorization header present (for backwards compatibility)
-
-This allows AuthPolicy to validate the OAuth token while backends receive their required API keys via the `x-mcp-api-key` header.
+The router does not currently inject authorization or API key headers into ext_proc responses. Client headers are passed through as-is during session initialization.
