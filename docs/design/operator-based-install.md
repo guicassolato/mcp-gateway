@@ -262,12 +262,10 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
-- [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
-- [ ] Update installation docs based on Generate OLM bundle being done
-
-
 
 ### Completed
+- [x] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
+- [x] Update installation docs based on Generate OLM bundle being done
 - [x] Add trusted-header key pair generation (optional feature)
 - [x] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [x] Implement HTTPRoute creation for gateway access

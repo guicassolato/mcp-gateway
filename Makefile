@@ -24,6 +24,32 @@ GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_DIRTY := $(shell git diff --quiet 2>/dev/null && echo "" || echo "-dirty")
 LDFLAGS := -X main.version=$(VERSION) -X main.gitSHA=$(GIT_SHA) -X main.dirty=$(GIT_DIRTY)
 
+# Image tag and bundle version derivation (matches kuadrant-operator pattern)
+DEFAULT_IMAGE_TAG = latest
+is_semantic_version = $(shell [[ $(1) =~ ^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$$ ]] && echo "true")
+version_is_semantic := $(call is_semantic_version,$(VERSION))
+ifeq (0.0.0,$(VERSION))
+BUNDLE_VERSION = $(VERSION)
+IMAGE_TAG = latest
+else ifeq ($(version_is_semantic),true)
+BUNDLE_VERSION = $(VERSION)
+IMAGE_TAG = v$(VERSION)
+else
+BUNDLE_VERSION = 0.0.0
+IMAGE_TAG ?= $(DEFAULT_IMAGE_TAG)
+endif
+
+# OLM
+REGISTRY ?= ghcr.io
+ORG ?= kuadrant
+IMAGE_TAG_BASE ?= $(REGISTRY)/$(ORG)/mcp-controller
+GATEWAY_IMG ?= $(REGISTRY)/$(ORG)/mcp-gateway:$(IMAGE_TAG)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG)
+CHANNELS ?= preview
+DEFAULT_CHANNEL ?= preview
+INSTALL_OLM ?= false
+
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
@@ -118,7 +144,7 @@ check-rbac-sync: yq ## Check if kustomize and helm chart RBAC rules match genera
 	fi
 
 # Run all sync checks
-check: check-crd-sync check-rbac-sync ## Check all generated resources are synchronized
+check: check-crd-sync check-bundle-crd-sync check-rbac-sync ## Check all generated resources are synchronized
 
 # Generate CRDs from Go types
 generate-crds: generate ## Generate CRD manifests from Go types
@@ -161,6 +187,15 @@ check-crd-sync: ## Check if CRDs are synchronized between config/crd and charts/
 	else \
 		echo "✅ CRDs are synchronized"; \
 	fi
+
+# Check if bundle manifests are up to date
+check-bundle-crd-sync: bundle ## Check if bundle manifests are up to date
+	@if ! git diff --quiet bundle/; then \
+		echo "❌ Bundle manifests are out of date. Run 'make bundle' and commit the changes."; \
+		git diff --stat bundle/; \
+		exit 1; \
+	fi
+	@echo "✅ Bundle manifests are up to date"
 
 # Install CRD
 install-crd: ## Install MCPServerRegistration and MCPVirtualServer CRDs
@@ -225,13 +260,13 @@ build-and-load-image: kind build-image load-image restart-all  ## Build & load r
 
 .PHONY: load-image
 load-image: kind ## Load the mcp-gateway image into the kind cluster
-	$(call load-image,ghcr.io/kuadrant/mcp-gateway:latest)
-	$(call load-image,ghcr.io/kuadrant/mcp-controller:latest)
+	$(call load-image,$(GATEWAY_IMG))
+	$(call load-image,$(IMAGE_TAG_BASE):$(IMAGE_TAG))
 
 .PHONY: build-image
 build-image: kind ## Build the mcp-gateway image
-	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --build-arg LDFLAGS="$(LDFLAGS)" -t ghcr.io/kuadrant/mcp-gateway:latest .
-	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t ghcr.io/kuadrant/mcp-controller:latest .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --build-arg LDFLAGS="$(LDFLAGS)" -t $(GATEWAY_IMG) .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t $(IMAGE_TAG_BASE):$(IMAGE_TAG) .
 
 # Deploy example MCPServerRegistration
 deploy-example: install-crd ## Deploy example MCPServerRegistration resource
@@ -330,19 +365,24 @@ deploy-e2e-gateways: ## Deploy two gateways for e2e multi-gateway tests
 
 # Build and push container image TODO we have this and build-image lets just use one
 docker-build: ## Build container image locally
-	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --build-arg LDFLAGS="$(LDFLAGS)" -t ghcr.io/kuadrant/mcp-gateway:latest .
-	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t ghcr.io/kuadrant/mcp-controller:latest .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --build-arg LDFLAGS="$(LDFLAGS)" -t $(GATEWAY_IMG) .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t $(IMAGE_TAG_BASE):$(IMAGE_TAG) .
+
+.PHONY: docker-push
+docker-push: ## Push container images to registry
+	$(CONTAINER_ENGINE) push $(GATEWAY_IMG)
+	$(CONTAINER_ENGINE) push $(IMAGE_TAG_BASE):$(IMAGE_TAG)
 
 # Common reload steps
 define reload-image
-	@docker tag mcp-gateway:local ghcr.io/kuadrant/mcp-gateway:latest
-	@$(call load-image,ghcr.io/kuadrant/mcp-gateway:latest)
+	@docker tag mcp-gateway:local $(GATEWAY_IMG)
+	@$(call load-image,$(GATEWAY_IMG))
 endef
 
 .PHONY: reload-controller
 reload-controller: build kind ## Build, load to Kind, and restart controller
-	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t ghcr.io/kuadrant/mcp-controller:latest .	
-	$(call load-image,ghcr.io/kuadrant/mcp-controller:latest)	
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) --file Dockerfile.controller -t $(IMAGE_TAG_BASE):$(IMAGE_TAG) .
+	$(call load-image,$(IMAGE_TAG_BASE):$(IMAGE_TAG))
 	@kubectl rollout restart -n mcp-system deployment/mcp-controller
 	@kubectl rollout status -n mcp-system deployment/mcp-controller --timeout=60s
 
@@ -503,6 +543,8 @@ tools: ## Install all required tools (kind, helm, kustomize, yq, istioctl, contr
 	@if [ -f bin/yq ]; then echo "[OK] yq already installed"; else echo "Installing yq..."; "$(MAKE)" -s yq; fi
 	@if [ -f bin/istioctl ]; then echo "[OK] istioctl already installed"; else echo "Installing istioctl..."; "$(MAKE)" -s istioctl; fi
 	@if [ -f bin/controller-gen ]; then echo "[OK] controller-gen already installed"; else echo "Installing controller-gen..."; "$(MAKE)" -s controller-gen; fi
+	@if [ -f bin/operator-sdk ]; then echo "[OK] operator-sdk already installed"; else echo "Installing operator-sdk..."; "$(MAKE)" -s operator-sdk; fi
+	@if [ -f bin/opm ]; then echo "[OK] opm already installed"; else echo "Installing opm..."; "$(MAKE)" -s opm; fi
 	@echo "All tools ready!"
 
 .PHONY: local-env-setup
@@ -512,8 +554,17 @@ local-env-setup: setup-cluster-base ## Setup complete local demo environment wit
 	@echo "========================================="
 	# Deploy single gateway for local demo
 	"$(MAKE)" deploy-gateway
-	# Deploy controller + MCPGatewayExtension
+ifeq ($(INSTALL_OLM),true)
+	# Deploy controller via OLM (default)
+	"$(MAKE)" deploy-namespaces
+	kubectl apply -f config/mcp-gateway/overlays/mcp-system/trusted-header-public-key.yaml -n $(MCP_GATEWAY_NAMESPACE)
+	"$(MAKE)" deploy-olm
+	kubectl apply -k config/mcp-gateway/base/ -n $(MCP_GATEWAY_NAMESPACE)
+	@kubectl wait --for=condition=Ready mcpgatewayextension/mcp-gateway-extension -n $(MCP_GATEWAY_NAMESPACE) --timeout=$(WAIT_TIME)
+else
+	# Deploy controller via kustomize (non-OLM fallback)
 	"$(MAKE)" deploy
+endif
 	"${MAKE}" add-jwt-key
 	# Deploy and configure test servers
 	"$(MAKE)" deploy-test-servers

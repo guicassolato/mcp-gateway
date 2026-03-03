@@ -100,3 +100,108 @@ jobs:
             LDFLAGS=${{ steps.build-args.outputs.ldflags }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  build-bundle:
+    name: Build Bundle Image
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase owner
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install tools
+        run: make olm-tools
+
+      - name: Generate bundle
+        run: |
+          make bundle \
+            VERSION=${{ steps.version.outputs.version }} \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
+
+      - name: Build and push bundle image
+        run: |
+          make bundle-build \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
+          make bundle-push \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
+
+  build-catalog:
+    name: Build Catalog Image
+    needs: build-bundle
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase owner
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Install tools
+        run: make olm-tools
+
+      - name: Generate and build catalog image
+        run: |
+          make catalog \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
+          make catalog-build \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
+          make catalog-push \
+            REGISTRY=${{ env.REGISTRY }} \
+            ORG=${{ steps.owner.outputs.name }} \
+            IMAGE_TAG=${{ github.ref_name }}
