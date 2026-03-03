@@ -262,9 +262,9 @@ func (r *MCPGatewayExtensionReconciler) validateGatewayTarget(ctx context.Contex
 				mcpExt.Spec.TargetRef.SectionName, targetGateway.Namespace, targetGateway.Name, mcpv1alpha1.AnnotationPublicHost))
 	}
 
-	// fetch the namespace so we can check selector-based listener allowedRoutes
+	// fetch the namespace directly to avoid setting up an informer via the cached client
 	ns := &corev1.Namespace{}
-	if err := r.Get(ctx, types.NamespacedName{Name: mcpExt.Namespace}, ns); err != nil {
+	if err := r.DirectAPIReader.Get(ctx, types.NamespacedName{Name: mcpExt.Namespace}, ns); err != nil {
 		return nil, nil, fmt.Errorf("failed to get namespace %s: %w", mcpExt.Namespace, err)
 	}
 
