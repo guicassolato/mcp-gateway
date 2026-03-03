@@ -240,8 +240,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 	}
 
 	existingServiceAccount := &corev1.ServiceAccount{}
-	err = r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), existingServiceAccount)
-	if err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), existingServiceAccount); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.Info("creating broker-router service account", "namespace", mcpExt.Namespace)
 			if err := r.Create(ctx, serviceAccount); err != nil {
@@ -265,8 +264,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 	}
 
 	existingDeployment := &appsv1.Deployment{}
-	err = r.Get(ctx, client.ObjectKeyFromObject(deployment), existingDeployment)
-	if err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(deployment), existingDeployment); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.Info("creating broker-router deployment", "namespace", mcpExt.Namespace)
 			if err := r.Create(ctx, deployment); err != nil {
@@ -294,8 +292,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 	}
 
 	existingService := &corev1.Service{}
-	err = r.Get(ctx, client.ObjectKeyFromObject(service), existingService)
-	if err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(service), existingService); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.Info("creating broker-router service", "namespace", mcpExt.Namespace)
 			if err := r.Create(ctx, service); err != nil {
@@ -321,8 +318,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 		}
 
 		existingHTTPRoute := &gatewayv1.HTTPRoute{}
-		err = r.Get(ctx, client.ObjectKeyFromObject(httpRoute), existingHTTPRoute)
-		if err != nil {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(httpRoute), existingHTTPRoute); err != nil {
 			if apierrors.IsNotFound(err) {
 				r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
 				if err := r.Create(ctx, httpRoute); err != nil {
