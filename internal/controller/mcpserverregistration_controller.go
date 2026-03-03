@@ -271,7 +271,7 @@ func (r *MCPReconciler) findValidGatewaysForMCPServer(ctx context.Context, targe
 		// lets fetch the parents that are valid
 		for _, parent := range targetHTTPRoute.Status.Parents {
 			acceptedCond := meta.FindStatusCondition(parent.Conditions, string(gatewayv1.GatewayConditionAccepted))
-			if acceptedCond.Status == metav1.ConditionTrue {
+			if acceptedCond != nil && acceptedCond.Status == metav1.ConditionTrue {
 				pr := parent.ParentRef.DeepCopy()
 				if pr.Namespace == nil {
 					pr.Namespace = ptr.To(gatewayv1.Namespace(targetHTTPRoute.Namespace))
