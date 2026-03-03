@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -201,13 +201,16 @@ func stripPort(host string) string {
 }
 
 // derivePublicHost determines the public host for the MCP Gateway.
-// Priority: annotation override > listener hostname.
+// priority: annotation override > listener hostname.
 // For wildcard hostnames (*.example.com), we use mcp.example.com as the default subdomain.
 // Any port suffix is stripped since HTTPRoute hostnames don't allow ports.
 func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOverride string) (string, error) {
 	var hostname string
 	// annotation takes precedence for backwards compatibility
 	if annotationOverride != "" {
+		if strings.Contains(annotationOverride, "://") {
+			return "", fmt.Errorf("invalid public host %q: must be a hostname, not a URL", annotationOverride)
+		}
 		hostname = stripPort(annotationOverride)
 	} else if listenerConfig != nil && listenerConfig.Hostname != "" {
 		hostname = listenerConfig.Hostname
@@ -219,8 +222,8 @@ func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOver
 	if hostname == "" {
 		return "", fmt.Errorf("unable to derive public host: no hostname available")
 	}
-	if _, err := url.ParseRequestURI("http://" + hostname); err != nil {
-		return "", fmt.Errorf("invalid public host %q: %w", hostname, err)
+	if errs := validation.IsDNS1123Subdomain(hostname); len(errs) > 0 {
+		return "", fmt.Errorf("invalid public host %q: %s", hostname, strings.Join(errs, "; "))
 	}
 	return hostname, nil
 }

@@ -791,6 +791,24 @@ func TestDerivePublicHost(t *testing.T) {
 			annotationOverride: "mcp.127-0-0-1.sslip.io",
 			want:               "mcp.127-0-0-1.sslip.io",
 		},
+		{
+			name:               "invalid hostname with path returns error",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "example.com/path"},
+			annotationOverride: "",
+			wantErr:            true,
+		},
+		{
+			name:               "annotation with scheme should error",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "https://example.com",
+			wantErr:            true,
+		},
+		{
+			name:               "annotation with path should error",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "example.com/path",
+			wantErr:            true,
+		},
 	}
 
 	for _, tt := range tests {
