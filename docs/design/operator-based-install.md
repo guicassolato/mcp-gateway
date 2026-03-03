@@ -147,16 +147,47 @@ spec:
 
 #### Spec Fields
 
-Some flags will also be able to be set via the `MCPGatewayExtension` resource if needed:
+Configuration that was previously set via annotations will move to proper spec fields. This follows [Kubernetes API conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md) — spec is for desired state, annotations are for external tooling. The existing `kuadrant.io/alpha-*` annotations will be removed (clean break, as the alpha prefix indicates they are subject to change).
+
+Boolean fields are avoided per API conventions ("Think twice about bool fields. Many ideas start as boolean but eventually trend towards a small set of mutually exclusive options"). String enums are used instead for extensibility.
 
 ```yaml
 spec:
-  publicHost: kuadrant.mcp-gateway.mcp # overrides the default from the listener (example if it is a wildcard)
-  backendPingIntervalSeconds: 60 #how often the gateway connects and checks the backend MCP server
-  trustedHeadersKey: # will trigger mount of secret into gateway and generate a key pair to use
+  # overrides the public host derived from the listener hostname
+  # use when the listener has a wildcard and you need a specific host
+  # +optional
+  publicHost: kuadrant.mcp-gateway.mcp
+
+  # overrides the private/internal host used for hair-pinning requests back through the gateway
+  # defaults to <gateway>-istio.<ns>.svc.cluster.local:<port>
+  # +optional
+  privateHost: mcp-gateway-istio.gateway-system.svc.cluster.local:8080
+
+  # how often (in seconds) the broker pings upstream MCP servers
+  # +optional
+  # +kubebuilder:validation:Minimum=1
+  # +kubebuilder:validation:Maximum=3600
+  backendPingIntervalSeconds: 60
+
+  # controls whether the operator manages the gateway HTTPRoute
+  # Auto: creates and manages the HTTPRoute (default)
+  # Disabled: does not create an HTTPRoute
+  # +optional
+  # +kubebuilder:default=Auto
+  # +kubebuilder:validation:Enum=Auto;Disabled
+  httpRouteManagement: Auto
+
+  # will trigger mount of secret into gateway and generate a key pair to use (separate TODO)
+  trustedHeadersKey:
     secretName: trusted-headers-key
     generate: true
 ```
+
+**Removed annotations** (replaced by spec fields above):
+- `kuadrant.io/alpha-gateway-public-host` → `spec.publicHost`
+- `kuadrant.io/alpha-gateway-poll-interval` → `spec.backendPingIntervalSeconds`
+- `kuadrant.io/alpha-disable-httproute` → `spec.httpRouteManagement`
+- `kuadrant.io/alpha-gateway-listener-port` → removed entirely (port derived from sectionName)
 
 ### Component Changes
 
