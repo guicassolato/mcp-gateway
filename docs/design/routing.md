@@ -68,3 +68,46 @@ To configure the MCP Gateway we have two different routes with distinct routing 
 - **The MCP Gateway Route:** This route is how agents interact with the Gateway and is intended to be the route exposed for use (for example via a DNS resolvable hostname). The default backend for this route must be the MCP Broker component. From a client perspective this endpoint acts as an MCP Server.[Example](../../config/mcp-system/httproute.yaml). Although this route will also receive tools/calls it does not actually send tools/calls to the broker backend. These are intercepted and re-routed.
 
 - **Individual MCP Server Routes:** These are intended to route to individual MCP Servers that can handle distinct tools/calls from a client. There can be many of these routes but there is expected to be a 1:1 relationship between a route and a MCP Backend. Each MCP Server route should have some form of hostname set and it should match the gateway listener (in the above example `*.mcp.local`). The hostname used, is not hugely important as it is not expected to be DNS resolvable. In our examples we use `{ServerName}.mcp.local` in the HTTPRoute. Each route should have a single rule that points at the MCP backend. [Example](../../config/test-servers/server1-httproute.yaml).
+
+### MCPServerRegistration Config Routing
+
+When the controller reconciles an MCPServerRegistration, it must decide which MCPGatewayExtension namespaces should receive the server's config in their `mcp-gateway-config` secret. The listener port (derived from the MCPGatewayExtension's `sectionName`) is the binding key for this filtering.
+
+#### Flow
+
+1. **Resolve the HTTPRoute**: The controller fetches the HTTPRoute referenced by the MCPServerRegistration's `targetRef`.
+2. **Find accepted Gateways**: From the HTTPRoute's status, it collects all parent Gateways that have accepted the route (`Accepted=True`).
+3. **Find MCPGatewayExtensions**: For each accepted Gateway, it finds all valid MCPGatewayExtensions targeting that Gateway.
+4. **Filter by listener port**: For each MCPGatewayExtension, the controller looks up the listener port from the extension's `sectionName`. It then checks whether the HTTPRoute attaches to a listener on that same port.
+
+```
+MCPServerRegistration
+    │
+    ▼
+HTTPRoute (from targetRef)
+    │
+    ▼
+Accepted Gateway(s) (from HTTPRoute status)
+    │
+    ▼
+MCPGatewayExtension(s) targeting Gateway
+    │
+    ▼
+Filter: does HTTPRoute attach to a listener
+        on the same port as the extension's sectionName?
+    │
+    ├── parentRef.sectionName set → listener name must be on same port
+    └── no sectionName → hostname match on same port (wildcard supported)
+    │
+    ▼
+Write config to matching extension namespace(s)
+```
+
+#### Attachment check
+
+The `httpRouteAttachesToListener` function checks whether an HTTPRoute is attached to a listener on the same port as the MCPGatewayExtension's target listener. It operates in two modes:
+
+- **Explicit sectionName in HTTPRoute parentRef**: The parentRef's `sectionName` must resolve to a listener on the same port as the extension's target listener.
+- **No sectionName in HTTPRoute parentRef**: The HTTPRoute's hostnames are matched against hostnames of all listeners on the same port, with wildcard support (e.g. `server1.team-a.mcp.local` matches `*.team-a.mcp.local`).
+
+This is what enables team isolation on a shared gateway. If team-a's listeners are on port 8080 and team-b's on port 8081, each team's broker only receives config for MCP servers whose HTTPRoutes attach to their respective port.

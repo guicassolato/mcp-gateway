@@ -42,25 +42,28 @@ func createTestNamespace(ctx context.Context, name string) {
 	Expect(client.IgnoreAlreadyExists(testK8sClient.Create(ctx, ns))).To(Succeed())
 }
 
-// createTestGateway creates a Gateway for testing
-func createTestGateway(name, namespace string) *gatewayv1.Gateway {
-	gateway := &gatewayv1.Gateway{
+// createTestGateway creates a Gateway for testing. An optional hostname can be
+// provided to set the listener hostname (used when HTTPRoute creation is under test).
+func createTestGateway(name, namespace string, hostname ...string) *gatewayv1.Gateway {
+	listener := gatewayv1.Listener{
+		Name:     "http",
+		Port:     80,
+		Protocol: gatewayv1.HTTPProtocolType,
+	}
+	if len(hostname) > 0 && hostname[0] != "" {
+		hn := gatewayv1.Hostname(hostname[0])
+		listener.Hostname = &hn
+	}
+	return &gatewayv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: gatewayv1.GatewaySpec{
 			GatewayClassName: "test-class",
-			Listeners: []gatewayv1.Listener{
-				{
-					Name:     "http",
-					Port:     80,
-					Protocol: gatewayv1.HTTPProtocolType,
-				},
-			},
+			Listeners:        []gatewayv1.Listener{listener},
 		},
 	}
-	return gateway
 }
 
 // createTestReferenceGrant creates a ReferenceGrant allowing MCPGatewayExtension to reference Gateways
@@ -967,6 +970,123 @@ var _ = Describe("MCPGatewayExtension Controller", func() {
 				}, envoyFilter)
 				g.Expect(errors.IsNotFound(err)).To(BeTrue())
 			}, testTimeout, testRetryInterval).Should(Succeed())
+		})
+	})
+
+	Context("When reconciling gateway HTTPRoute", func() {
+		const resourceName = "test-httproute-resource"
+		const gatewayName = "test-httproute-gateway"
+		const testHostname = "mcp.example.com"
+
+		ctx := context.Background()
+
+		mcpExtNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: "default",
+		}
+
+		httpRouteNN := types.NamespacedName{
+			Name:      gatewayHTTPRouteName,
+			Namespace: "default",
+		}
+
+		BeforeEach(func() {
+			gw := createTestGateway(gatewayName, "default", testHostname)
+			Expect(testK8sClient.Create(ctx, gw)).To(Succeed())
+			ext := createTestMCPGatewayExtension(resourceName, "default", gatewayName, "default")
+			Expect(testK8sClient.Create(ctx, ext)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			forceDeleteTestMCPGatewayExtension(ctx, resourceName, "default")
+			deleteTestGateway(ctx, gatewayName, "default")
+			// clean up httproute
+			httpRoute := &gatewayv1.HTTPRoute{}
+			if err := testK8sClient.Get(ctx, httpRouteNN, httpRoute); err == nil {
+				_ = testK8sClient.Delete(ctx, httpRoute)
+			}
+			// clean up deployment and service
+			deployment := &appsv1.Deployment{}
+			if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: "default"}, deployment); err == nil {
+				_ = testK8sClient.Delete(ctx, deployment)
+			}
+			service := &corev1.Service{}
+			if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: "default"}, service); err == nil {
+				_ = testK8sClient.Delete(ctx, service)
+			}
+		})
+
+		It("should create HTTPRoute with correct spec", func() {
+			reconciler := newTestReconciler()
+			waitForCacheSync(ctx, mcpExtNamespacedName)
+
+			// reconcile until HTTPRoute is created
+			Eventually(func(g Gomega) {
+				_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: mcpExtNamespacedName})
+				g.Expect(err).NotTo(HaveOccurred())
+
+				httpRoute := &gatewayv1.HTTPRoute{}
+				g.Expect(testK8sClient.Get(ctx, httpRouteNN, httpRoute)).To(Succeed())
+			}, testTimeout, testRetryInterval).Should(Succeed())
+
+			// verify HTTPRoute details
+			httpRoute := &gatewayv1.HTTPRoute{}
+			Expect(testK8sClient.Get(ctx, httpRouteNN, httpRoute)).To(Succeed())
+
+			// verify hostname
+			Expect(httpRoute.Spec.Hostnames).To(HaveLen(1))
+			Expect(string(httpRoute.Spec.Hostnames[0])).To(Equal(testHostname))
+
+			// verify parentRef
+			Expect(httpRoute.Spec.ParentRefs).To(HaveLen(1))
+			Expect(string(httpRoute.Spec.ParentRefs[0].Name)).To(Equal(gatewayName))
+			Expect(httpRoute.Spec.ParentRefs[0].SectionName).NotTo(BeNil())
+			Expect(string(*httpRoute.Spec.ParentRefs[0].SectionName)).To(Equal("http"))
+
+			// verify owner reference
+			mcpExt := &mcpv1alpha1.MCPGatewayExtension{}
+			Expect(testK8sClient.Get(ctx, mcpExtNamespacedName, mcpExt)).To(Succeed())
+			Expect(httpRoute.OwnerReferences).To(HaveLen(1))
+			Expect(httpRoute.OwnerReferences[0].UID).To(Equal(mcpExt.UID))
+		})
+
+		It("should not create HTTPRoute when disabled by annotation", func() {
+			// add the disable annotation before reconciling
+			ext := &mcpv1alpha1.MCPGatewayExtension{}
+			Expect(testK8sClient.Get(ctx, mcpExtNamespacedName, ext)).To(Succeed())
+			if ext.Annotations == nil {
+				ext.Annotations = map[string]string{}
+			}
+			ext.Annotations[mcpv1alpha1.AnnotationDisableHTTPRoute] = "true"
+			Expect(testK8sClient.Update(ctx, ext)).To(Succeed())
+
+			reconciler := newTestReconciler()
+			waitForCacheSync(ctx, mcpExtNamespacedName)
+
+			// wait for cache to see the annotation update
+			Eventually(func(g Gomega) {
+				cached := &mcpv1alpha1.MCPGatewayExtension{}
+				g.Expect(testIndexedClient.Get(ctx, mcpExtNamespacedName, cached)).To(Succeed())
+				g.Expect(cached.Annotations[mcpv1alpha1.AnnotationDisableHTTPRoute]).To(Equal("true"))
+			}, testTimeout, testRetryInterval).Should(Succeed())
+
+			// reconcile multiple times to ensure HTTPRoute is never created
+			Eventually(func(g Gomega) {
+				_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: mcpExtNamespacedName})
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// verify deployment was created (reconciliation proceeded)
+				deployment := &appsv1.Deployment{}
+				g.Expect(testK8sClient.Get(ctx, types.NamespacedName{
+					Name:      brokerRouterName,
+					Namespace: "default",
+				}, deployment)).To(Succeed())
+			}, testTimeout, testRetryInterval).Should(Succeed())
+
+			// verify HTTPRoute does NOT exist
+			httpRoute := &gatewayv1.HTTPRoute{}
+			err := testK8sClient.Get(ctx, httpRouteNN, httpRoute)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 })

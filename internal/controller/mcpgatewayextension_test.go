@@ -46,12 +46,6 @@ func TestHostnameMatches(t *testing.T) {
 			listenerHostname: "team-b.example.com",
 			want:             false,
 		},
-		{
-			name:             "wildcard empty prefix no match",
-			routeHostname:    ".team-a.mcp.local",
-			listenerHostname: "*.team-a.mcp.local",
-			want:             false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -141,6 +141,59 @@ func TestMCPGatewayExtension_PollInterval(t *testing.T) {
 	}
 }
 
+func TestHTTPRouteDisabled(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+	}{
+		{
+			name:        "no annotations returns false",
+			annotations: nil,
+			want:        false,
+		},
+		{
+			name:        "empty annotations map returns false",
+			annotations: map[string]string{},
+			want:        false,
+		},
+		{
+			name: "annotation set to true returns true",
+			annotations: map[string]string{
+				AnnotationDisableHTTPRoute: "true",
+			},
+			want: true,
+		},
+		{
+			name: "annotation set to false returns false",
+			annotations: map[string]string{
+				AnnotationDisableHTTPRoute: "false",
+			},
+			want: false,
+		},
+		{
+			name: "annotation set to empty string returns false",
+			annotations: map[string]string{
+				AnnotationDisableHTTPRoute: "",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &MCPGatewayExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: tt.annotations,
+				},
+			}
+			if got := m.HTTPRouteDisabled(); got != tt.want {
+				t.Errorf("HTTPRouteDisabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMCPGatewayExtension_ListenerPort(t *testing.T) {
 	tests := []struct {
 		name        string

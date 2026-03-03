@@ -13,15 +13,6 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-// testListenerConfig returns a default listener config for tests
-func testListenerConfig() *mcpv1alpha1.ListenerConfig {
-	return &mcpv1alpha1.ListenerConfig{
-		Port:     8080,
-		Hostname: "mcp.example.com",
-		Name:     "test-listener",
-	}
-}
-
 func TestDeploymentNeedsUpdate(t *testing.T) {
 	baseDeployment := func() *appsv1.Deployment {
 		return &appsv1.Deployment{
@@ -347,34 +338,24 @@ func TestServiceNeedsUpdate(t *testing.T) {
 
 func TestBuildBrokerRouterDeployment_PublicHost(t *testing.T) {
 	tests := []struct {
-		name           string
-		annotations    map[string]string
-		listenerConfig *mcpv1alpha1.ListenerConfig
-		wantFlag       string
+		name       string
+		publicHost string
+		wantFlag   string
 	}{
 		{
-			name:           "annotation overrides listener hostname",
-			annotations:    map[string]string{mcpv1alpha1.AnnotationPublicHost: "override.example.com"},
-			listenerConfig: &mcpv1alpha1.ListenerConfig{Port: 8080, Hostname: "listener.example.com"},
-			wantFlag:       "--mcp-gateway-public-host=override.example.com",
+			name:       "annotation overrides listener hostname",
+			publicHost: "override.example.com",
+			wantFlag:   "--mcp-gateway-public-host=override.example.com",
 		},
 		{
-			name:           "uses listener hostname when no annotation",
-			annotations:    nil,
-			listenerConfig: &mcpv1alpha1.ListenerConfig{Port: 8080, Hostname: "listener.example.com"},
-			wantFlag:       "--mcp-gateway-public-host=listener.example.com",
+			name:       "uses listener hostname",
+			publicHost: "listener.example.com",
+			wantFlag:   "--mcp-gateway-public-host=listener.example.com",
 		},
 		{
-			name:           "handles wildcard listener hostname",
-			annotations:    nil,
-			listenerConfig: &mcpv1alpha1.ListenerConfig{Port: 8080, Hostname: "*.example.com"},
-			wantFlag:       "--mcp-gateway-public-host=mcp.example.com",
-		},
-		{
-			name:           "empty public host when no annotation and no listener hostname",
-			annotations:    nil,
-			listenerConfig: &mcpv1alpha1.ListenerConfig{Port: 8080, Hostname: ""},
-			wantFlag:       "--mcp-gateway-public-host=",
+			name:       "wildcard resolved to mcp subdomain",
+			publicHost: "mcp.example.com",
+			wantFlag:   "--mcp-gateway-public-host=mcp.example.com",
 		},
 	}
 
@@ -385,9 +366,8 @@ func TestBuildBrokerRouterDeployment_PublicHost(t *testing.T) {
 			}
 			mcpExt := &mcpv1alpha1.MCPGatewayExtension{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-ext",
-					Namespace:   "test-ns",
-					Annotations: tt.annotations,
+					Name:      "test-ext",
+					Namespace: "test-ns",
 				},
 				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
 					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
@@ -397,7 +377,7 @@ func TestBuildBrokerRouterDeployment_PublicHost(t *testing.T) {
 				},
 			}
 
-			deployment := r.buildBrokerRouterDeployment(mcpExt, tt.listenerConfig)
+			deployment := r.buildBrokerRouterDeployment(mcpExt, tt.publicHost, "my-gateway-istio.gateway-system.svc.cluster.local:8080")
 			command := deployment.Spec.Template.Spec.Containers[0].Command
 
 			found := false
@@ -456,7 +436,7 @@ func TestBuildBrokerRouterDeployment_InternalHost(t *testing.T) {
 				},
 			}
 
-			deployment := r.buildBrokerRouterDeployment(mcpExt, testListenerConfig())
+			deployment := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
 			command := deployment.Spec.Template.Spec.Containers[0].Command
 
 			wantFlag := "--mcp-gateway-private-host=" + tt.wantInternalHost
@@ -528,7 +508,7 @@ func TestBuildBrokerRouterDeployment_PollInterval(t *testing.T) {
 				},
 			}
 
-			deployment := r.buildBrokerRouterDeployment(mcpExt, testListenerConfig())
+			deployment := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
 			command := deployment.Spec.Template.Spec.Containers[0].Command
 
 			if tt.wantAbsent {
@@ -572,7 +552,7 @@ func TestBuildBrokerRouterDeployment_RouterKey(t *testing.T) {
 		},
 	}
 
-	deployment := r.buildBrokerRouterDeployment(mcpExt, testListenerConfig())
+	deployment := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
 	command := deployment.Spec.Template.Spec.Containers[0].Command
 
 	// verify router key flag is present
@@ -593,7 +573,7 @@ func TestBuildBrokerRouterDeployment_RouterKey(t *testing.T) {
 	}
 
 	// verify key is deterministic for same UID
-	deployment2 := r.buildBrokerRouterDeployment(mcpExt, testListenerConfig())
+	deployment2 := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
 	command2 := deployment2.Spec.Template.Spec.Containers[0].Command
 	var keyValue2 string
 	for _, arg := range command2 {
@@ -609,7 +589,7 @@ func TestBuildBrokerRouterDeployment_RouterKey(t *testing.T) {
 	// verify different UID produces different key
 	mcpExt2 := mcpExt.DeepCopy()
 	mcpExt2.UID = types.UID("different-uid-67890")
-	deployment3 := r.buildBrokerRouterDeployment(mcpExt2, testListenerConfig())
+	deployment3 := r.buildBrokerRouterDeployment(mcpExt2, "mcp.example.com", mcpExt2.InternalHost(8080))
 	command3 := deployment3.Spec.Template.Spec.Containers[0].Command
 	var keyValue3 string
 	for _, arg := range command3 {
@@ -739,7 +719,7 @@ func TestBuildBrokerRouterDeployment_ServiceAccount(t *testing.T) {
 		},
 	}
 
-	deployment := r.buildBrokerRouterDeployment(mcpExt, testListenerConfig())
+	deployment := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
 
 	if deployment.Spec.Template.Spec.ServiceAccountName != brokerRouterName {
 		t.Errorf("expected ServiceAccountName %q, got %q", brokerRouterName, deployment.Spec.Template.Spec.ServiceAccountName)
@@ -797,6 +777,18 @@ func TestDerivePublicHost(t *testing.T) {
 			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "*.example.com"},
 			annotationOverride: "specific.example.com",
 			want:               "specific.example.com",
+		},
+		{
+			name:               "strips port from annotation override",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "mcp.127-0-0-1.sslip.io:8001",
+			want:               "mcp.127-0-0-1.sslip.io",
+		},
+		{
+			name:               "annotation without port unchanged",
+			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: "listener.example.com"},
+			annotationOverride: "mcp.127-0-0-1.sslip.io",
+			want:               "mcp.127-0-0-1.sslip.io",
 		},
 	}
 
@@ -913,6 +905,7 @@ func TestListenerAllowsNamespace(t *testing.T) {
 		listener         *gatewayv1.Listener
 		namespace        string
 		gatewayNamespace string
+		nsLabels         map[string]string
 		want             bool
 	}{
 		{
@@ -978,7 +971,43 @@ func TestListenerAllowsNamespace(t *testing.T) {
 			want:             true,
 		},
 		{
-			name: "Selector allows (we accept it since proper validation requires API calls)",
+			name: "Selector matches namespace labels",
+			listener: &gatewayv1.Listener{
+				Name: "test",
+				AllowedRoutes: &gatewayv1.AllowedRoutes{
+					Namespaces: &gatewayv1.RouteNamespaces{
+						From: &selectorNamespace,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+				},
+			},
+			namespace:        "any-ns",
+			gatewayNamespace: "gateway-ns",
+			nsLabels:         map[string]string{"env": "prod", "team": "backend"},
+			want:             true,
+		},
+		{
+			name: "Selector does not match namespace labels",
+			listener: &gatewayv1.Listener{
+				Name: "test",
+				AllowedRoutes: &gatewayv1.AllowedRoutes{
+					Namespaces: &gatewayv1.RouteNamespaces{
+						From: &selectorNamespace,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+				},
+			},
+			namespace:        "any-ns",
+			gatewayNamespace: "gateway-ns",
+			nsLabels:         map[string]string{"env": "staging"},
+			want:             false,
+		},
+		{
+			name: "Selector with nil selector rejects",
 			listener: &gatewayv1.Listener{
 				Name: "test",
 				AllowedRoutes: &gatewayv1.AllowedRoutes{
@@ -989,7 +1018,7 @@ func TestListenerAllowsNamespace(t *testing.T) {
 			},
 			namespace:        "any-ns",
 			gatewayNamespace: "gateway-ns",
-			want:             true,
+			want:             false,
 		},
 		{
 			name: "nil From defaults to Same",
@@ -1009,9 +1038,141 @@ func TestListenerAllowsNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := listenerAllowsNamespace(tt.listener, tt.namespace, tt.gatewayNamespace)
+			got := listenerAllowsNamespace(tt.listener, tt.namespace, tt.gatewayNamespace, tt.nsLabels)
 			if got != tt.want {
 				t.Errorf("listenerAllowsNamespace() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildGatewayHTTPRoute(t *testing.T) {
+	reconciler := &MCPGatewayExtensionReconciler{}
+
+	tests := []struct {
+		name           string
+		mcpExt         *mcpv1alpha1.MCPGatewayExtension
+		publicHost     string
+		expectHostname string
+	}{
+		{
+			name: "exact hostname",
+			mcpExt: &mcpv1alpha1.MCPGatewayExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
+					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
+						Name:        "my-gateway",
+						Namespace:   "gateway-ns",
+						SectionName: "mcp",
+					},
+				},
+			},
+			publicHost:     "mcp.example.com",
+			expectHostname: "mcp.example.com",
+		},
+		{
+			name: "wildcard resolved to mcp subdomain",
+			mcpExt: &mcpv1alpha1.MCPGatewayExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
+					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
+						Name:        "my-gateway",
+						Namespace:   "gateway-ns",
+						SectionName: "wildcard",
+					},
+				},
+			},
+			publicHost:     "mcp.example.com",
+			expectHostname: "mcp.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			route := reconciler.buildGatewayHTTPRoute(tt.mcpExt, tt.publicHost)
+			if route == nil {
+				t.Fatal("expected non-nil HTTPRoute")
+			}
+			if route.Name != gatewayHTTPRouteName {
+				t.Errorf("name = %q, want %q", route.Name, gatewayHTTPRouteName)
+			}
+			if route.Namespace != tt.mcpExt.Namespace {
+				t.Errorf("namespace = %q, want %q", route.Namespace, tt.mcpExt.Namespace)
+			}
+			if len(route.Spec.Hostnames) != 1 || string(route.Spec.Hostnames[0]) != tt.expectHostname {
+				t.Errorf("hostnames = %v, want [%s]", route.Spec.Hostnames, tt.expectHostname)
+			}
+			if len(route.Spec.ParentRefs) != 1 {
+				t.Fatalf("expected 1 parentRef, got %d", len(route.Spec.ParentRefs))
+			}
+			parentRef := route.Spec.ParentRefs[0]
+			if string(parentRef.Name) != tt.mcpExt.Spec.TargetRef.Name {
+				t.Errorf("parentRef name = %q, want %q", parentRef.Name, tt.mcpExt.Spec.TargetRef.Name)
+			}
+			if parentRef.SectionName == nil || string(*parentRef.SectionName) != tt.mcpExt.Spec.TargetRef.SectionName {
+				t.Errorf("parentRef sectionName = %v, want %q", parentRef.SectionName, tt.mcpExt.Spec.TargetRef.SectionName)
+			}
+		})
+	}
+}
+
+func TestHTTPRouteNeedsUpdate(t *testing.T) {
+	reconciler := &MCPGatewayExtensionReconciler{}
+	mcpExt := &mcpv1alpha1.MCPGatewayExtension{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
+			TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
+				Name:        "my-gateway",
+				Namespace:   "gateway-ns",
+				SectionName: "mcp",
+			},
+		},
+	}
+	publicHost := "mcp.example.com"
+
+	tests := []struct {
+		name       string
+		modify     func(r *gatewayv1.HTTPRoute)
+		wantUpdate bool
+	}{
+		{
+			name:       "no changes",
+			modify:     func(_ *gatewayv1.HTTPRoute) {},
+			wantUpdate: false,
+		},
+		{
+			name: "hostname changed",
+			modify: func(r *gatewayv1.HTTPRoute) {
+				r.Spec.Hostnames = []gatewayv1.Hostname{"other.example.com"}
+			},
+			wantUpdate: true,
+		},
+		{
+			name: "parentRef changed",
+			modify: func(r *gatewayv1.HTTPRoute) {
+				r.Spec.ParentRefs[0].Name = "other-gateway"
+			},
+			wantUpdate: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desired := reconciler.buildGatewayHTTPRoute(mcpExt, publicHost)
+			existing := reconciler.buildGatewayHTTPRoute(mcpExt, publicHost)
+			tt.modify(existing)
+			needsUpdate, _ := httpRouteNeedsUpdate(desired, existing)
+			if needsUpdate != tt.wantUpdate {
+				t.Errorf("httpRouteNeedsUpdate() = %v, want %v", needsUpdate, tt.wantUpdate)
 			}
 		})
 	}

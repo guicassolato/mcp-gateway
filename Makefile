@@ -186,7 +186,6 @@ deploy-gateway-instance-helm: install-crd ## Deploy only the broker/router (with
   --set envoyFilter.name=$(MCP_GATEWAY_NAMESPACE) \
   --set broker.checkInterval=10\
   --set gateway.publicHost=$(MCP_GATEWAY_HOST) \
-  --set httpRoute.create=true \
   --set gateway.nodePort.create=true \
   --set mcpGatewayExtension.gatewayRef.name=$(MCP_GATEWAY_NAME) \
   --set mcpGatewayExtension.gatewayRef.namespace=gateway-system
@@ -289,6 +288,10 @@ kind-load-conformance-server: kind build-conformance-server ## Load conformance 
 	@echo "Loading conformance server image into Kind cluster..."
 	$(call load-image,ghcr.io/kuadrant/mcp-gateway/test-conformance-server:latest)
 
+# Deploy test servers excluding oidc
+deploy-simple-test-servers: kind-load-test-servers ## Deploy test MCP servers for local testing
+	@echo "Deploying test MCP servers..."
+	kubectl apply -k config/test-servers/
 # Deploy test servers
 deploy-test-servers: kind-load-test-servers ## Deploy test MCP servers for local testing
 	@echo "Deploying test MCP servers..."

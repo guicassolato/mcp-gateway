@@ -116,6 +116,18 @@
 - When team-b attempts to create an MCPGatewayExtension targeting "team-a-external":
   - The extension should be marked Invalid because the listener's allowedRoutes does not permit routes from namespace "team-b"
 
+### [Happy] MCPGatewayExtension creates HTTPRoute for gateway access
+
+- When an MCPGatewayExtension is created targeting a Gateway listener with a hostname, the controller should automatically create an HTTPRoute named "mcp-gateway-route" in the same namespace as the MCPGatewayExtension. The HTTPRoute should have a parentRef pointing to the target Gateway with the correct sectionName, a hostname matching the listener hostname (or "mcp.<domain>" for wildcard listeners), a PathPrefix match on /mcp, and a backendRef to the mcp-gateway service on port 8080. The HTTPRoute should have an owner reference to the MCPGatewayExtension so it is cleaned up automatically on deletion. MCP clients should be able to reach the gateway at the derived hostname without any manual HTTPRoute creation.
+
+### [Happy] MCPGatewayExtension with disable-httproute annotation skips HTTPRoute creation
+
+- When an MCPGatewayExtension has the annotation `kuadrant.io/alpha-disable-httproute: "true"`, the controller should NOT create an HTTPRoute. This allows users to manage their own HTTPRoute with custom configuration (e.g. CORS response headers, additional path rules like /.well-known/oauth-protected-resource). The MCPGatewayExtension should still become Ready and all other resources (Deployment, Service, EnvoyFilter) should be created normally.
+
+### [multi-gateway] Each MCPGatewayExtension gets its own HTTPRoute
+
+- When multiple MCPGatewayExtensions target different listeners on a shared Gateway, each should get its own HTTPRoute with the correct hostname derived from its listener. For example, team-a's HTTPRoute should have hostname "team-a.127-0-0-1.sslip.io" and team-b's should have "team-b.127-0-0-1.sslip.io". Each HTTPRoute's parentRef should reference the correct sectionName. Clients should be able to reach each team's gateway independently via the correct hostname.
+
 ### [multi-gateway] MCPGatewayExtension rejected when targeting a listener port already in use
 
 - When a Gateway has two listeners on the same port (e.g. both on port 8080) and an MCPGatewayExtension already targets one of those listeners:
