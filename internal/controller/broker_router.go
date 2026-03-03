@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -191,37 +193,43 @@ func routerKey(mcpExt *mcpv1alpha1.MCPGatewayExtension) string {
 
 // stripPort removes port suffix from a host string (e.g. "example.com:8001" -> "example.com")
 func stripPort(host string) string {
-	if i := strings.LastIndex(host, ":"); i != -1 {
-		return host[:i]
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		return host
 	}
-	return host
+	return h
 }
 
 // derivePublicHost determines the public host for the MCP Gateway.
-// Priority: annotation override > listener hostname > empty string
+// Priority: annotation override > listener hostname.
 // For wildcard hostnames (*.example.com), we use mcp.example.com as the default subdomain.
 // Any port suffix is stripped since HTTPRoute hostnames don't allow ports.
-func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOverride string) string {
+func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOverride string) (string, error) {
+	var hostname string
 	// annotation takes precedence for backwards compatibility
 	if annotationOverride != "" {
-		return stripPort(annotationOverride)
+		hostname = stripPort(annotationOverride)
+	} else if listenerConfig != nil && listenerConfig.Hostname != "" {
+		hostname = listenerConfig.Hostname
+		// handle wildcard hostnames: *.example.com -> mcp.example.com
+		if strings.HasPrefix(hostname, "*.") {
+			hostname = "mcp" + hostname[1:]
+		}
 	}
-	if listenerConfig == nil || listenerConfig.Hostname == "" {
-		return ""
+	if hostname == "" {
+		return "", fmt.Errorf("unable to derive public host: no hostname available")
 	}
-	hostname := listenerConfig.Hostname
-	// handle wildcard hostnames: *.example.com -> mcp.example.com
-	if strings.HasPrefix(hostname, "*.") {
-		return "mcp" + hostname[1:]
+	if _, err := url.ParseRequestURI("http://" + hostname); err != nil {
+		return "", fmt.Errorf("invalid public host %q: %w", hostname, err)
 	}
-	return hostname
+	return hostname, nil
 }
 
 func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) (bool, error) {
 	// derive values from listener config before building resources
-	publicHost := derivePublicHost(listenerConfig, mcpExt.PublicHost())
-	if publicHost == "" {
-		return false, fmt.Errorf("unable to derive public host: listener %q has no hostname and no public host annotation is set", listenerConfig.Name)
+	publicHost, err := derivePublicHost(listenerConfig, mcpExt.PublicHost())
+	if err != nil {
+		return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid, err.Error())
 	}
 	internalHost := mcpExt.InternalHost(listenerConfig.Port)
 
@@ -232,7 +240,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 	}
 
 	existingServiceAccount := &corev1.ServiceAccount{}
-	err := r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), existingServiceAccount)
+	err = r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), existingServiceAccount)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.Info("creating broker-router service account", "namespace", mcpExt.Namespace)
@@ -318,8 +326,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 			if apierrors.IsNotFound(err) {
 				r.log.Info("creating gateway httproute", "namespace", mcpExt.Namespace)
 				if err := r.Create(ctx, httpRoute); err != nil {
-					return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
-						fmt.Sprintf("failed to create httproute: %v", err))
+					return false, fmt.Errorf("failed to create httproute: %w", err)
 				}
 			} else {
 				return false, fmt.Errorf("failed to get httproute: %w", err)
@@ -330,8 +337,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 			existingHTTPRoute.Spec.Hostnames = httpRoute.Spec.Hostnames
 			existingHTTPRoute.Spec.Rules = httpRoute.Spec.Rules
 			if err := r.Update(ctx, existingHTTPRoute); err != nil {
-				return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
-					fmt.Sprintf("failed to update httproute: %v", err))
+				return false, fmt.Errorf("failed to update httproute: %w", err)
 			}
 		}
 	}

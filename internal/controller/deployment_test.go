@@ -735,6 +735,7 @@ func TestDerivePublicHost(t *testing.T) {
 		listenerConfig     *mcpv1alpha1.ListenerConfig
 		annotationOverride string
 		want               string
+		wantErr            bool
 	}{
 		{
 			name:               "annotation overrides listener hostname",
@@ -761,16 +762,16 @@ func TestDerivePublicHost(t *testing.T) {
 			want:               "mcp.team-a.example.com",
 		},
 		{
-			name:               "empty hostname returns empty",
+			name:               "empty hostname returns error",
 			listenerConfig:     &mcpv1alpha1.ListenerConfig{Hostname: ""},
 			annotationOverride: "",
-			want:               "",
+			wantErr:            true,
 		},
 		{
-			name:               "nil listener config returns empty",
+			name:               "nil listener config returns error",
 			listenerConfig:     nil,
 			annotationOverride: "",
-			want:               "",
+			wantErr:            true,
 		},
 		{
 			name:               "annotation takes precedence even with wildcard",
@@ -794,7 +795,17 @@ func TestDerivePublicHost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := derivePublicHost(tt.listenerConfig, tt.annotationOverride)
+			got, err := derivePublicHost(tt.listenerConfig, tt.annotationOverride)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("derivePublicHost() expected error, got %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("derivePublicHost() unexpected error: %v", err)
+				return
+			}
 			if got != tt.want {
 				t.Errorf("derivePublicHost() = %q, want %q", got, tt.want)
 			}
