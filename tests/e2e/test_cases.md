@@ -120,9 +120,9 @@
 
 - When an MCPGatewayExtension is created targeting a Gateway listener with a hostname, the controller should automatically create an HTTPRoute named "mcp-gateway-route" in the same namespace as the MCPGatewayExtension. The HTTPRoute should have a parentRef pointing to the target Gateway with the correct sectionName, a hostname matching the listener hostname (or "mcp.<domain>" for wildcard listeners), a PathPrefix match on /mcp, and a backendRef to the mcp-gateway service on port 8080. The HTTPRoute should have an owner reference to the MCPGatewayExtension so it is cleaned up automatically on deletion. MCP clients should be able to reach the gateway at the derived hostname without any manual HTTPRoute creation.
 
-### [Happy] MCPGatewayExtension with disable-httproute annotation skips HTTPRoute creation
+### [Happy] MCPGatewayExtension with httpRouteManagement Disabled skips HTTPRoute creation
 
-- When an MCPGatewayExtension has the annotation `kuadrant.io/alpha-disable-httproute: "true"`, the controller should NOT create an HTTPRoute. This allows users to manage their own HTTPRoute with custom configuration (e.g. CORS response headers, additional path rules like /.well-known/oauth-protected-resource). The MCPGatewayExtension should still become Ready and all other resources (Deployment, Service, EnvoyFilter) should be created normally.
+- When an MCPGatewayExtension has `spec.httpRouteManagement: Disabled`, the controller should NOT create an HTTPRoute. This allows users to manage their own HTTPRoute with custom configuration (e.g. CORS response headers, additional path rules like /.well-known/oauth-protected-resource). The MCPGatewayExtension should still become Ready and all other resources (Deployment, Service, EnvoyFilter) should be created normally.
 
 ### [multi-gateway] Each MCPGatewayExtension gets its own HTTPRoute
 

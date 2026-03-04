@@ -23,7 +23,9 @@ const (
 	// ConditionReasonDeploymentNotReady is the reason when the broker-router deployment is not ready
 	ConditionReasonDeploymentNotReady = "DeploymentNotReady"
 
-	HTTPRouteManagementAuto     HTTPRouteManagementPolicy = "Auto"
+	// HTTPRouteManagementAuto means the operator creates and manages the HTTPRoute
+	HTTPRouteManagementAuto HTTPRouteManagementPolicy = "Auto"
+	// HTTPRouteManagementDisabled means the operator does not create an HTTPRoute
 	HTTPRouteManagementDisabled HTTPRouteManagementPolicy = "Disabled"
 )
 
