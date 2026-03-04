@@ -59,16 +59,17 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 	command := []string{"./mcp_gateway", fmt.Sprintf("--mcp-broker-public-address=0.0.0.0:%d", brokerHTTPPort),
 		"--mcp-gateway-private-host=" + internalHost,
 		"--mcp-gateway-config=/config/config.yaml"}
-	// annotation takes precedence over reconciler default
-	pollInterval := mcpExt.PollInterval()
-	if pollInterval == "" {
+	// spec takes precedence over reconciler default
+	var pollInterval string
+	if mcpExt.Spec.BackendPingIntervalSeconds != nil {
+		pollInterval = fmt.Sprintf("%d", *mcpExt.Spec.BackendPingIntervalSeconds)
+	} else if r.BrokerPollInterval != "" {
 		pollInterval = r.BrokerPollInterval
-	}
-	if pollInterval != "" {
-		// the flag expects seconds as a plain number; parse duration strings like "60s" or "5m"
 		if d, err := time.ParseDuration(pollInterval); err == nil {
 			pollInterval = fmt.Sprintf("%d", int64(d.Seconds()))
 		}
+	}
+	if pollInterval != "" {
 		command = append(command, "--mcp-check-interval="+pollInterval)
 	}
 	command = append(command, "--mcp-gateway-public-host="+publicHost)
@@ -313,7 +314,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 		}
 	}
 
-	// reconcile gateway HTTPRoute (unless disabled by annotation)
+	// reconcile gateway HTTPRoute (unless disabled by spec)
 	if !mcpExt.HTTPRouteDisabled() {
 		httpRoute := r.buildGatewayHTTPRoute(mcpExt, publicHost)
 		if err := controllerutil.SetControllerReference(mcpExt, httpRoute, r.Scheme); err != nil {

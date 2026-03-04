@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -456,35 +457,35 @@ func TestBuildBrokerRouterDeployment_InternalHost(t *testing.T) {
 
 func TestBuildBrokerRouterDeployment_PollInterval(t *testing.T) {
 	tests := []struct {
-		name               string
-		annotations        map[string]string
-		reconcilerInterval string
-		wantFlag           string
-		wantAbsent         bool
+		name                string
+		backendPingInterval *int32
+		reconcilerInterval  string
+		wantFlag            string
+		wantAbsent          bool
 	}{
 		{
-			name:               "poll interval from annotation",
-			annotations:        map[string]string{mcpv1alpha1.AnnotationPollInterval: "30"},
-			reconcilerInterval: "",
-			wantFlag:           "--mcp-check-interval=30",
+			name:                "poll interval from spec",
+			backendPingInterval: ptr.To(int32(30)),
+			reconcilerInterval:  "",
+			wantFlag:            "--mcp-check-interval=30",
 		},
 		{
-			name:               "poll interval from reconciler when no annotation",
-			annotations:        nil,
-			reconcilerInterval: "60s",
-			wantFlag:           "--mcp-check-interval=60",
+			name:                "poll interval from reconciler when spec not set",
+			backendPingInterval: nil,
+			reconcilerInterval:  "60s",
+			wantFlag:            "--mcp-check-interval=60",
 		},
 		{
-			name:               "no poll interval flag when both empty",
-			annotations:        nil,
-			reconcilerInterval: "",
-			wantAbsent:         true,
+			name:                "no poll interval flag when both empty",
+			backendPingInterval: nil,
+			reconcilerInterval:  "",
+			wantAbsent:          true,
 		},
 		{
-			name:               "annotation takes precedence over reconciler",
-			annotations:        map[string]string{mcpv1alpha1.AnnotationPollInterval: "15"},
-			reconcilerInterval: "60s",
-			wantFlag:           "--mcp-check-interval=15",
+			name:                "spec takes precedence over reconciler",
+			backendPingInterval: ptr.To(int32(15)),
+			reconcilerInterval:  "60s",
+			wantFlag:            "--mcp-check-interval=15",
 		},
 	}
 
@@ -496,11 +497,11 @@ func TestBuildBrokerRouterDeployment_PollInterval(t *testing.T) {
 			}
 			mcpExt := &mcpv1alpha1.MCPGatewayExtension{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-ext",
-					Namespace:   "test-ns",
-					Annotations: tt.annotations,
+					Name:      "test-ext",
+					Namespace: "test-ns",
 				},
 				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
+					BackendPingIntervalSeconds: tt.backendPingInterval,
 					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
 						Name:      "my-gateway",
 						Namespace: "gateway-system",
