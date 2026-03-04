@@ -1,11 +1,12 @@
 # Migrating MCPGatewayExtension from v0.5.0
 
-This guide covers migrating an existing MCPGatewayExtension from v0.5.0 to the latest version. Two changes require attention:
+This guide covers migrating an existing MCPGatewayExtension from v0.5.0 to the latest version. Three changes require attention:
 
 >**Note:** this is not intended as an upgrade guide but more to highlight what needs to change. At this stage we don't promise any upgrade path between versions.
 
 1. **`sectionName` is now required** in the `targetRef`
 2. **HTTPRoute is now created automatically** by the controller
+3. **Annotations replaced by spec fields**
 
 ## sectionName
 
@@ -75,7 +76,7 @@ The controller now automatically creates an HTTPRoute named `mcp-gateway-route` 
 
 ### If you have an existing HTTPRoute
 
-If you already have a manually created HTTPRoute for the MCP endpoint, you must disable automatic creation to avoid duplicate routes. Add the `kuadrant.io/alpha-disable-httproute` annotation:
+If you already have a manually created HTTPRoute for the MCP endpoint, you must disable automatic creation to avoid duplicate routes. Set `spec.httpRouteManagement` to `Disabled`:
 
 ```yaml
 apiVersion: mcp.kagenti.com/v1alpha1
@@ -83,9 +84,8 @@ kind: MCPGatewayExtension
 metadata:
   name: my-mcp-gateway
   namespace: mcp-system
-  annotations:
-    kuadrant.io/alpha-disable-httproute: "true"
 spec:
+  httpRouteManagement: Disabled  # enum: Auto (default) or Disabled
   targetRef:
     group: gateway.networking.k8s.io
     kind: Gateway
@@ -96,7 +96,7 @@ spec:
 
 This is useful when your HTTPRoute includes custom configuration such as CORS headers, additional path rules, or OAuth well-known endpoints that the auto-generated route does not include.
 
-> **Important:** Setting `kuadrant.io/alpha-disable-httproute: "true"` prevents the controller from creating or updating the HTTPRoute, but does not delete a previously auto-created `mcp-gateway-route`. You must delete it manually once your custom HTTPRoute is in place:
+> **Important:** Setting `httpRouteManagement: Disabled` prevents the controller from creating or updating the HTTPRoute, but does not delete a previously auto-created `mcp-gateway-route`. You must delete it manually once your custom HTTPRoute is in place:
 > ```bash
 > kubectl delete httproute mcp-gateway-route -n mcp-system
 > ```
@@ -117,7 +117,7 @@ kubectl get httproute mcp-gateway-route -n mcp-system
 
 The `httpRoute.create` Helm value has been removed. The controller handles HTTPRoute creation. If you were using `--set httpRoute.create=true` in your Helm commands, remove that flag.
 
-If you need a custom HTTPRoute, set the annotation on the MCPGatewayExtension instead:
+If you need a custom HTTPRoute, set `httpRouteManagement: Disabled` on the MCPGatewayExtension instead:
 
 ```bash
 helm upgrade mcp-gateway ./charts/mcp-gateway \
@@ -127,12 +127,69 @@ helm upgrade mcp-gateway ./charts/mcp-gateway \
   --set mcpGatewayExtension.gatewayRef.namespace=gateway-system
 ```
 
-Then annotate the MCPGatewayExtension, delete the auto-created HTTPRoute, and create your custom one:
+Then patch the MCPGatewayExtension, delete the auto-created HTTPRoute, and create your custom one:
 
 ```bash
-kubectl annotate mcpgatewayextension -n mcp-system my-mcp-gateway \
-  kuadrant.io/alpha-disable-httproute=true
+kubectl patch mcpgatewayextension -n mcp-system my-mcp-gateway \
+  --type merge -p '{"spec":{"httpRouteManagement":"Disabled"}}'
 
 kubectl delete httproute mcp-gateway-route -n mcp-system --ignore-not-found
 kubectl apply -f my-custom-httproute.yaml
 ```
+
+## Annotations replaced by spec fields
+
+Previous versions used annotations to configure MCPGatewayExtension behavior. These have been replaced by spec fields.
+
+### Before (annotations)
+
+```yaml
+apiVersion: mcp.kagenti.com/v1alpha1
+kind: MCPGatewayExtension
+metadata:
+  name: my-mcp-gateway
+  namespace: mcp-system
+  annotations:
+    kuadrant.io/alpha-gateway-public-host: "mcp.example.com"
+    kuadrant.io/alpha-gateway-poll-interval: "30s"
+    kuadrant.io/alpha-disable-httproute: "true"
+    kuadrant.io/alpha-gateway-listener-port: "8080"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: mcp-gateway
+    namespace: gateway-system
+    sectionName: mcp
+```
+
+### After (spec fields)
+
+```yaml
+apiVersion: mcp.kagenti.com/v1alpha1
+kind: MCPGatewayExtension
+metadata:
+  name: my-mcp-gateway
+  namespace: mcp-system
+spec:
+  publicHost: mcp.example.com
+  privateHost: mcp-gateway-istio.gateway-system.svc.cluster.local:8080  # optional, overrides internal host for hair-pinning
+  backendPingIntervalSeconds: 30          # integer seconds (was string "30s")
+  httpRouteManagement: Disabled           # enum: Auto (default) or Disabled
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: mcp-gateway
+    namespace: gateway-system
+    sectionName: mcp
+```
+
+### Migration mapping
+
+| Old annotation | New spec field | Notes |
+|---|---|---|
+| `kuadrant.io/alpha-gateway-public-host` | `spec.publicHost` | same value |
+| `kuadrant.io/alpha-gateway-poll-interval` | `spec.backendPingIntervalSeconds` | integer seconds, was duration string |
+| `kuadrant.io/alpha-disable-httproute` | `spec.httpRouteManagement` | `"true"` becomes `Disabled`, default is `Auto` |
+| `kuadrant.io/alpha-gateway-listener-port` | removed | port is derived from `sectionName` listener |
+| (new) | `spec.privateHost` | overrides internal host for hair-pinning |
