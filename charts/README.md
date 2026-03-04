@@ -14,7 +14,7 @@ The MCP Gateway Helm chart deploys:
 
 When the MCPGatewayExtension becomes ready, the controller automatically creates:
 - **MCP Broker/Router**: Aggregates and routes MCP (Model Context Protocol) requests (Deployment + Service named `mcp-gateway`)
-- **HTTPRoute**: Named `mcp-gateway-route`, routes `/mcp` traffic from the Gateway listener to the broker service. Disable with annotation `kuadrant.io/alpha-disable-httproute: "true"` if you need a custom HTTPRoute
+- **HTTPRoute**: Named `mcp-gateway-route`, routes `/mcp` traffic from the Gateway listener to the broker service. Disable with `spec.httpRouteManagement: Disabled` if you need a custom HTTPRoute
 - **EnvoyFilter**: Configures Istio with the MCP Router ext-proc filter (created in the Gateway's namespace)
 
 ## Prerequisites

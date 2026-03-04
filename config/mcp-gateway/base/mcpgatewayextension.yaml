@@ -2,8 +2,6 @@ apiVersion: mcp.kagenti.com/v1alpha1
 kind: MCPGatewayExtension
 metadata:
   name: mcp-gateway-extension
-  annotations:
-    kuadrant.io/alpha-gateway-public-host: "mcp.127-0-0-1.sslip.io"
 spec:
   targetRef:
     group: gateway.networking.k8s.io
@@ -11,3 +9,4 @@ spec:
     name: mcp-gateway
     namespace: gateway-system
     sectionName: mcp
+  publicHost: "mcp.127-0-0-1.sslip.io"
