@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -562,34 +564,33 @@ func (s *MCPGatewayExtensionSetup) WithHTTPRoute() *MCPGatewayExtensionSetup {
 
 // Build creates the MCPGatewayExtension and ReferenceGrant objects (without registering them)
 func (s *MCPGatewayExtensionSetup) Build() *MCPGatewayExtensionSetup {
-	// build MCPGatewayExtension
-	annotations := map[string]string{}
+	spec := mcpv1alpha1.MCPGatewayExtensionSpec{
+		TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
+			Group:       "gateway.networking.k8s.io",
+			Kind:        "Gateway",
+			Name:        s.gatewayName,
+			Namespace:   s.gatewayNamespace,
+			SectionName: s.sectionName,
+		},
+	}
 	if s.publicHost != "" {
-		annotations[mcpv1alpha1.AnnotationPublicHost] = s.publicHost
+		spec.PublicHost = s.publicHost
 	}
 	if s.pollInterval != "" {
-		annotations[mcpv1alpha1.AnnotationPollInterval] = s.pollInterval
+		interval, _ := strconv.Atoi(s.pollInterval)
+		spec.BackendPingIntervalSeconds = ptr.To(int32(interval))
 	}
 	if s.disableHTTPRoute {
-		annotations[mcpv1alpha1.AnnotationDisableHTTPRoute] = "true"
+		spec.HTTPRouteManagement = mcpv1alpha1.HTTPRouteManagementDisabled
 	}
 
 	s.extension = &mcpv1alpha1.MCPGatewayExtension{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        s.name,
-			Namespace:   s.namespace,
-			Labels:      map[string]string{"e2e": "test"},
-			Annotations: annotations,
+			Name:      s.name,
+			Namespace: s.namespace,
+			Labels:    map[string]string{"e2e": "test"},
 		},
-		Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
-			TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
-				Group:       "gateway.networking.k8s.io",
-				Kind:        "Gateway",
-				Name:        s.gatewayName,
-				Namespace:   s.gatewayNamespace,
-				SectionName: s.sectionName,
-			},
-		},
+		Spec: spec,
 	}
 
 	// build ReferenceGrant if cross-namespace
