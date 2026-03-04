@@ -135,7 +135,6 @@ The Helm chart creates:
 - Gateway resource in gateway-system namespace
 - MCPGatewayExtension targeting the Gateway
 - ReferenceGrant in the Gateway namespace (for cross-namespace references)
-- EnvoyFilter to route traffic through the external processor
 
 The controller then automatically creates:
 - HTTPRoute for the MCP endpoint
