@@ -9,10 +9,8 @@ import (
 )
 
 func TestSayHi(t *testing.T) {
-	res, err := sayHi(context.Background(), &mcp.ServerSession{}, &mcp.CallToolParamsFor[hiArgs]{
-		Arguments: hiArgs{
-			Name: "Fred",
-		},
+	res, _, err := sayHi(context.Background(), &mcp.CallToolRequest{}, hiArgs{
+		Name: "Fred",
 	})
 	require.NoError(t, err)
 	require.False(t, res.IsError)
@@ -23,7 +21,7 @@ func TestSayHi(t *testing.T) {
 }
 
 func TestTimeTool(t *testing.T) {
-	res, err := timeTool(context.Background(), &mcp.ServerSession{}, &mcp.CallToolParamsFor[struct{}]{})
+	res, _, err := timeTool(context.Background(), &mcp.CallToolRequest{}, struct{}{})
 	require.NoError(t, err)
 	require.False(t, res.IsError)
 	require.NotNil(t, res)
@@ -32,7 +30,7 @@ func TestTimeTool(t *testing.T) {
 }
 
 func TestHeadersTool(t *testing.T) {
-	res, err := headersTool(context.Background(), &mcp.ServerSession{}, &mcp.CallToolParamsFor[struct{}]{})
+	res, _, err := headersTool(context.Background(), &mcp.CallToolRequest{}, struct{}{})
 	require.NoError(t, err)
 	require.False(t, res.IsError)
 	require.NotNil(t, res)
@@ -40,7 +38,7 @@ func TestHeadersTool(t *testing.T) {
 }
 
 func TestSlowTool(t *testing.T) {
-	res, err := slowTool(context.Background(), &mcp.ServerSession{}, &mcp.CallToolParamsFor[slowArgs]{})
+	res, _, err := slowTool(context.Background(), &mcp.CallToolRequest{}, slowArgs{})
 	require.NoError(t, err)
 	require.False(t, res.IsError)
 	require.NotNil(t, res)

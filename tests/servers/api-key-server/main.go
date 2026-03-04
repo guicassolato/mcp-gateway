@@ -21,14 +21,14 @@ type helloArgs struct {
 // tool implementation
 func helloWorldTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[helloArgs],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	params helloArgs,
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Hello, %s! (from authenticated server)", params.Arguments.Name)},
+			&mcp.TextContent{Text: fmt.Sprintf("Hello, %s! (from authenticated server)", params.Name)},
 		},
-	}, nil
+	}, nil, nil
 }
 
 // http middleware for auth validation

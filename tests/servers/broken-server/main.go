@@ -135,28 +135,28 @@ func createServerWithNoTools() {
 }
 
 // Tool handlers for conflicting tools
-func conflictingTimeHandler(_ context.Context, _ *mcp.ServerSession, _ *mcp.CallToolParamsFor[struct{}]) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+func conflictingTimeHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: "Broken-server conflicting time: " + time.Now().Format(time.RFC3339)},
 		},
-	}, nil
+	}, nil, nil
 }
 
-func conflictingSlowHandler(_ context.Context, _ *mcp.ServerSession, _ *mcp.CallToolParamsFor[struct{}]) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+func conflictingSlowHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: "Broken-server slow tool (for conflict testing)"},
 		},
-	}, nil
+	}, nil, nil
 }
 
-func conflictingHeadersHandler(_ context.Context, _ *mcp.ServerSession, _ *mcp.CallToolParamsFor[struct{}]) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+func conflictingHeadersHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: "Broken-server headers tool (for conflict testing)"},
 		},
-	}, nil
+	}, nil, nil
 }
 
 func createServerWithConflictingTools() {

@@ -14,7 +14,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -39,35 +38,35 @@ type hiArgs struct {
 
 func sayHi(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[hiArgs],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	params hiArgs,
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: "Hi " + params.Arguments.Name},
+			&mcp.TextContent{Text: "Hi " + params.Name},
 		},
-	}, nil
+	}, nil, nil
 }
 
 // A simple tool that returns the current time
 func timeTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	_ *mcp.CallToolParamsFor[struct{}],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	_ struct{},
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: time.Now().String()},
 		},
-	}, nil
+	}, nil, nil
 }
 
 // A simple tool that returns all HTTP headers it received
 func headersTool(
 	ctx context.Context,
-	_ *mcp.ServerSession,
-	_ *mcp.CallToolParamsFor[struct{}],
-) (*mcp.CallToolResultFor[struct{}], error) {
+	_ *mcp.CallToolRequest,
+	_ struct{},
+) (*mcp.CallToolResult, any, error) {
 	content := make([]mcp.Content, 0)
 	headers, ok := ctx.Value(HeadersKey).(http.Header)
 	if ok {
@@ -76,9 +75,9 @@ func headersTool(
 		}
 	}
 
-	return &mcp.CallToolResultFor[struct{}]{
+	return &mcp.CallToolResult{
 		Content: content,
-	}, nil
+	}, nil, nil
 }
 
 type slowArgs struct {
@@ -97,51 +96,51 @@ type dynamicToolManager struct {
 // addTool dynamically adds a new tool to the server and triggers notifications/tools/list_changed
 func (m *dynamicToolManager) addTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[addToolArgs],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	name := params.Arguments.Name
-	desc := params.Arguments.Description
+	_ *mcp.CallToolRequest,
+	params addToolArgs,
+) (*mcp.CallToolResult, any, error) {
+	name := params.Name
+	desc := params.Description
 	if desc == "" {
 		desc = "dynamically added tool"
 	}
 
 	mcp.AddTool(m.server, &mcp.Tool{Name: name, Description: desc}, func(
 		_ context.Context,
-		_ *mcp.ServerSession,
-		_ *mcp.CallToolParamsFor[struct{}],
-	) (*mcp.CallToolResultFor[struct{}], error) {
-		return &mcp.CallToolResultFor[struct{}]{
+		_ *mcp.CallToolRequest,
+		_ struct{},
+	) (*mcp.CallToolResult, any, error) {
+		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: "I am the dynamically added tool: " + name},
 			},
-		}, nil
+		}, nil, nil
 	})
 
-	return &mcp.CallToolResultFor[struct{}]{
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Added new tool: %s", name)},
 		},
-	}, nil
+	}, nil, nil
 }
 
 // A long-running tool that waits N seconds, notifying the client of progress
 func slowTool(
 	ctx context.Context,
-	ss *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[slowArgs],
-) (*mcp.CallToolResultFor[struct{}], error) {
+	req *mcp.CallToolRequest,
+	params slowArgs,
+) (*mcp.CallToolResult, any, error) {
 	startTime := time.Now()
-	fmt.Printf("Slow tool will wait for %d seconds\n", params.Arguments.Seconds)
+	fmt.Printf("Slow tool will wait for %d seconds\n", params.Seconds)
 	for {
 		waited := int(time.Since(startTime).Seconds())
-		if waited >= params.Arguments.Seconds {
+		if waited >= params.Seconds {
 			break
 		}
 
 		var progressToken string
-		if params.Meta != nil {
-			rawProgressToken := params.Meta["progressToken"]
+		if req != nil && req.Params != nil && req.Params.Meta != nil {
+			rawProgressToken := req.Params.Meta["progressToken"]
 			switch v := rawProgressToken.(type) {
 			case string:
 				progressToken = v
@@ -152,9 +151,9 @@ func slowTool(
 			}
 		}
 
-		if progressToken != "" {
+		if progressToken != "" && req != nil && req.Session != nil {
 			fmt.Printf("Notify client that we have waited %d seconds\n", waited)
-			err := ss.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			err := req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
 				Message:       fmt.Sprintf("Waited %d seconds...", waited),
 				ProgressToken: progressToken,
 				Progress:      float64(waited),
@@ -167,22 +166,21 @@ func slowTool(
 		time.Sleep(1 * time.Second)
 	}
 
-	return &mcp.CallToolResultFor[struct{}]{
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{},
-	}, nil
+	}, nil, nil
 }
 
 func promptHi(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.GetPromptParams,
+	req *mcp.GetPromptRequest,
 ) (*mcp.GetPromptResult, error) {
 	return &mcp.GetPromptResult{
 		Description: "Code review prompt",
 		Messages: []*mcp.PromptMessage{
 			{
 				Role:    "user",
-				Content: &mcp.TextContent{Text: "Say hi to " + params.Arguments["name"]},
+				Content: &mcp.TextContent{Text: "Say hi to " + req.Params.Arguments["name"]},
 			},
 		},
 	}, nil
@@ -228,8 +226,7 @@ func main() {
 		_ = server.ListenAndServe()
 	} else {
 		log.Printf("MCP handler use stdio")
-		t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), os.Stderr)
-		if err := server.Run(context.Background(), t); err != nil {
+		if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 			log.Printf("Server failed: %v", err)
 		}
 	}
@@ -249,21 +246,19 @@ func (m mcpRecordHeaders) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // Simple middleware that just prints the method and parameters
 func rpcPrintMiddleware(
-	next mcp.MethodHandler[*mcp.ServerSession],
-) mcp.MethodHandler[*mcp.ServerSession] {
+	next mcp.MethodHandler,
+) mcp.MethodHandler {
 	return func(
 		ctx context.Context,
-		session *mcp.ServerSession,
 		method string,
-		params mcp.Params,
+		req mcp.Request,
 	) (mcp.Result, error) {
-		fmt.Printf("MCP method started: method=%s, session_id=%s, params=%v\n",
+		fmt.Printf("MCP method started: method=%s, params=%v\n",
 			method,
-			session.ID(),
-			params,
+			req,
 		)
 
-		result, err := next(ctx, session, method, params)
+		result, err := next(ctx, method, req)
 		return result, err
 	}
 }
@@ -274,10 +269,9 @@ var embeddedResources = map[string]string{
 
 func handleEmbeddedResource(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.ReadResourceParams,
+	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
-	u, err := url.Parse(params.URI)
+	u, err := url.Parse(req.Params.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +285,7 @@ func handleEmbeddedResource(
 	}
 	return &mcp.ReadResourceResult{
 		Contents: []*mcp.ResourceContents{
-			{URI: params.URI, MIMEType: "text/plain", Text: text},
+			{URI: req.Params.URI, MIMEType: "text/plain", Text: text},
 		},
 	}, nil
 }

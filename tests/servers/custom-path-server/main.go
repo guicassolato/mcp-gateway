@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -25,38 +24,38 @@ type echoArgs struct {
 
 func echoTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[echoArgs],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	params echoArgs,
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Echo from custom path: %s", params.Arguments.Message)},
+			&mcp.TextContent{Text: fmt.Sprintf("Echo from custom path: %s", params.Message)},
 		},
-	}, nil
+	}, nil, nil
 }
 
 func pathInfoTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	_ *mcp.CallToolParamsFor[struct{}],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	_ struct{},
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: "This server is configured at /v1/special/mcp"},
 		},
-	}, nil
+	}, nil, nil
 }
 
 func timestampTool(
 	_ context.Context,
-	_ *mcp.ServerSession,
-	_ *mcp.CallToolParamsFor[struct{}],
-) (*mcp.CallToolResultFor[struct{}], error) {
-	return &mcp.CallToolResultFor[struct{}]{
+	_ *mcp.CallToolRequest,
+	_ struct{},
+) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Timestamp: %s", time.Now().Format(time.RFC3339))},
 		},
-	}, nil
+	}, nil, nil
 }
 
 func main() {
@@ -118,8 +117,7 @@ func main() {
 		}
 	} else {
 		log.Printf("MCP custom-path-server using stdio")
-		t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), os.Stderr)
-		if err := server.Run(context.Background(), t); err != nil {
+		if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 			log.Fatalf("Error running server: %v", err)
 		}
 	}
