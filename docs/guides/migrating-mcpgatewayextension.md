@@ -190,6 +190,7 @@ spec:
 |---|---|---|
 | `kuadrant.io/alpha-gateway-public-host` | `spec.publicHost` | same value |
 | `kuadrant.io/alpha-gateway-poll-interval` | `spec.backendPingIntervalSeconds` | integer seconds, was duration string |
-| `kuadrant.io/alpha-disable-httproute` | `spec.httpRouteManagement` | `"true"` becomes `Disabled`, default is `Auto` |
+| `kuadrant.io/alpha-disable-httproute` | `spec.httpRouteManagement` | `"true"` becomes `Disabled`, default is `Enabled` |
 | `kuadrant.io/alpha-gateway-listener-port` | removed | port is derived from `sectionName` listener |
 | (new) | `spec.privateHost` | overrides internal host for hair-pinning |
+
