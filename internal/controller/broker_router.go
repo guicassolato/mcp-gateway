@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -59,18 +58,9 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 	command := []string{"./mcp_gateway", fmt.Sprintf("--mcp-broker-public-address=0.0.0.0:%d", brokerHTTPPort),
 		"--mcp-gateway-private-host=" + internalHost,
 		"--mcp-gateway-config=/config/config.yaml"}
-	// spec takes precedence over reconciler default
-	var pollInterval string
+	// only override the binary's default (60s) when explicitly set in spec
 	if mcpExt.Spec.BackendPingIntervalSeconds != nil {
-		pollInterval = fmt.Sprintf("%d", *mcpExt.Spec.BackendPingIntervalSeconds)
-	} else if r.BrokerPollInterval != "" {
-		pollInterval = r.BrokerPollInterval
-		if d, err := time.ParseDuration(pollInterval); err == nil {
-			pollInterval = fmt.Sprintf("%d", int64(d.Seconds()))
-		}
-	}
-	if pollInterval != "" {
-		command = append(command, "--mcp-check-interval="+pollInterval)
+		command = append(command, fmt.Sprintf("--mcp-check-interval=%d", *mcpExt.Spec.BackendPingIntervalSeconds))
 	}
 	command = append(command, "--mcp-gateway-public-host="+publicHost)
 	command = append(command, "--mcp-router-key="+routerKey(mcpExt))

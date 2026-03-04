@@ -119,7 +119,6 @@ func main() {
 	}
 
 	brokerRouterImage := goenv.GetDefault("RELATED_IMAGE_ROUTER_BROKER", controller.DefaultBrokerRouterImage)
-	brokerPollInterval := os.Getenv("BROKER_POLL_INTERVAL")
 
 	if err = (&controller.MCPGatewayExtensionReconciler{
 		Client:                mgr.GetClient(),
@@ -128,7 +127,6 @@ func main() {
 		ConfigWriterDeleter:   &configReaderWriter,
 		MCPExtFinderValidator: mcpExtFinderValidator,
 		BrokerRouterImage:     brokerRouterImage,
-		BrokerPollInterval:    brokerPollInterval,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		panic("unable to start manager : " + err.Error())
 	}

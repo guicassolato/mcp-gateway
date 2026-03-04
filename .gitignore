@@ -43,3 +43,4 @@ go.work.sum
 # Ignore personal TODO lists
 TODO
 local/
+docs/plans/

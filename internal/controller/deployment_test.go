@@ -459,41 +459,25 @@ func TestBuildBrokerRouterDeployment_PollInterval(t *testing.T) {
 	tests := []struct {
 		name                string
 		backendPingInterval *int32
-		reconcilerInterval  string
 		wantFlag            string
 		wantAbsent          bool
 	}{
 		{
 			name:                "poll interval from spec",
 			backendPingInterval: ptr.To(int32(30)),
-			reconcilerInterval:  "",
 			wantFlag:            "--mcp-check-interval=30",
 		},
 		{
-			name:                "poll interval from reconciler when spec not set",
+			name:                "no flag when spec not set (binary default applies)",
 			backendPingInterval: nil,
-			reconcilerInterval:  "60s",
-			wantFlag:            "--mcp-check-interval=60",
-		},
-		{
-			name:                "no poll interval flag when both empty",
-			backendPingInterval: nil,
-			reconcilerInterval:  "",
 			wantAbsent:          true,
-		},
-		{
-			name:                "spec takes precedence over reconciler",
-			backendPingInterval: ptr.To(int32(15)),
-			reconcilerInterval:  "60s",
-			wantFlag:            "--mcp-check-interval=15",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &MCPGatewayExtensionReconciler{
-				BrokerRouterImage:  "test-image:v1",
-				BrokerPollInterval: tt.reconcilerInterval,
+				BrokerRouterImage: "test-image:v1",
 			}
 			mcpExt := &mcpv1alpha1.MCPGatewayExtension{
 				ObjectMeta: metav1.ObjectMeta{
