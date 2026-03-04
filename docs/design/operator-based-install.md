@@ -168,12 +168,12 @@ spec:
   backendPingIntervalSeconds: 60
 
   # controls whether the operator manages the gateway HTTPRoute
-  # Auto: creates and manages the HTTPRoute (default)
+  # Enabled: creates and manages the HTTPRoute (default)
   # Disabled: does not create an HTTPRoute
   # +optional
-  # +kubebuilder:default=Auto
-  # +kubebuilder:validation:Enum=Auto;Disabled
-  httpRouteManagement: Auto
+  # +kubebuilder:default=Enabled
+  # +kubebuilder:validation:Enum=Enabled;Disabled
+  httpRouteManagement: Enabled
 
   # will trigger mount of secret into gateway and generate a key pair to use (separate TODO)
   trustedHeadersKey:

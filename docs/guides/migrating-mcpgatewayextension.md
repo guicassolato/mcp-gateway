@@ -85,7 +85,7 @@ metadata:
   name: my-mcp-gateway
   namespace: mcp-system
 spec:
-  httpRouteManagement: Disabled  # enum: Auto (default) or Disabled
+  httpRouteManagement: Disabled  # enum: Enabled (default) or Disabled
   targetRef:
     group: gateway.networking.k8s.io
     kind: Gateway
@@ -175,7 +175,7 @@ spec:
   publicHost: mcp.example.com
   privateHost: mcp-gateway-istio.gateway-system.svc.cluster.local:8080  # optional, overrides internal host for hair-pinning
   backendPingIntervalSeconds: 30          # integer seconds (was string "30s")
-  httpRouteManagement: Disabled           # enum: Auto (default) or Disabled
+  httpRouteManagement: Disabled           # enum: Enabled (default) or Disabled
   targetRef:
     group: gateway.networking.k8s.io
     kind: Gateway

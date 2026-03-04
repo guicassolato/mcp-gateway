@@ -73,8 +73,8 @@ func TestMCPGatewayExtension_HTTPRouteManagementDisabled(t *testing.T) {
 			want:   false,
 		},
 		{
-			name:   "Auto returns false",
-			policy: HTTPRouteManagementAuto,
+			name:   "Enabled returns false",
+			policy: HTTPRouteManagementEnabled,
 			want:   false,
 		},
 		{

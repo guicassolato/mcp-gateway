@@ -8,7 +8,7 @@ import (
 )
 
 // HTTPRouteManagementPolicy defines how the operator manages the gateway HTTPRoute
-// +kubebuilder:validation:Enum=Auto;Disabled
+// +kubebuilder:validation:Enum=Enabled;Disabled
 type HTTPRouteManagementPolicy string
 
 const (
@@ -23,8 +23,8 @@ const (
 	// ConditionReasonDeploymentNotReady is the reason when the broker-router deployment is not ready
 	ConditionReasonDeploymentNotReady = "DeploymentNotReady"
 
-	// HTTPRouteManagementAuto means the operator creates and manages the HTTPRoute
-	HTTPRouteManagementAuto HTTPRouteManagementPolicy = "Auto"
+	// HTTPRouteManagementEnabled means the operator creates and manages the HTTPRoute
+	HTTPRouteManagementEnabled HTTPRouteManagementPolicy = "Enabled"
 	// HTTPRouteManagementDisabled means the operator does not create an HTTPRoute
 	HTTPRouteManagementDisabled HTTPRouteManagementPolicy = "Disabled"
 )
@@ -52,10 +52,10 @@ type MCPGatewayExtensionSpec struct {
 	BackendPingIntervalSeconds *int32 `json:"backendPingIntervalSeconds,omitempty"`
 
 	// HTTPRouteManagement controls whether the operator manages the gateway HTTPRoute.
-	// Auto: creates and manages the HTTPRoute (default).
+	// Enabled: creates and manages the HTTPRoute (default).
 	// Disabled: does not create an HTTPRoute.
 	// +optional
-	// +kubebuilder:default=Auto
+	// +kubebuilder:default=Enabled
 	HTTPRouteManagement HTTPRouteManagementPolicy `json:"httpRouteManagement,omitempty"`
 }
 

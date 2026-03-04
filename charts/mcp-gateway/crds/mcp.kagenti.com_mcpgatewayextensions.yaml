@@ -65,13 +65,13 @@ spec:
                 minimum: 1
                 type: integer
               httpRouteManagement:
-                default: Auto
+                default: Enabled
                 description: |-
                   HTTPRouteManagement controls whether the operator manages the gateway HTTPRoute.
-                  Auto: creates and manages the HTTPRoute (default).
+                  Enabled: creates and manages the HTTPRoute (default).
                   Disabled: does not create an HTTPRoute.
                 enum:
-                - Auto
+                - Enabled
                 - Disabled
                 type: string
               privateHost:
