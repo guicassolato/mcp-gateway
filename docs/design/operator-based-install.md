@@ -147,9 +147,7 @@ spec:
 
 #### Spec Fields
 
-Configuration that was previously set via annotations will move to proper spec fields. This follows [Kubernetes API conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md) — spec is for desired state, annotations are for external tooling. The existing `kuadrant.io/alpha-*` annotations will be removed (clean break, as the alpha prefix indicates they are subject to change).
-
-Boolean fields are avoided per API conventions ("Think twice about bool fields. Many ideas start as boolean but eventually trend towards a small set of mutually exclusive options"). String enums are used instead for extensibility.
+Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will be removed (clean break, as the alpha prefix indicates they are subject to change).
 
 ```yaml
 spec:
@@ -270,7 +268,7 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
-- [ ] Add MCPGatewayExtension spec properties based on the annotations and definition here
+- [x] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
 - [ ] Update installation docs based on Generate OLM bundle being done
 - [ ] Add trusted-header key pair generation (optional feature)
