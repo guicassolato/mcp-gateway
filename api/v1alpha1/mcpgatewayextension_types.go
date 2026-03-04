@@ -48,7 +48,7 @@ type MCPGatewayExtensionSpec struct {
 	// BackendPingIntervalSeconds specifies how often the broker pings upstream MCP servers.
 	// +optional
 	// +kubebuilder:validation:Minimum=10
-	// +kubebuilder:validation:Maximum=7200 (10mins)
+	// +kubebuilder:validation:Maximum=7200
 	// +kubebuilder:default=60
 	BackendPingIntervalSeconds *int32 `json:"backendPingIntervalSeconds,omitempty"`
 
