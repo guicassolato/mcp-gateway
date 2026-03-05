@@ -163,7 +163,7 @@ spec:
 
   # how often (in seconds) the broker pings upstream MCP servers
   # +optional
-  # +kubebuilder:validation:Minimum=1
+  # +kubebuilder:validation:Minimum=10
   # +kubebuilder:validation:Maximum=7200
   backendPingIntervalSeconds: 60
 

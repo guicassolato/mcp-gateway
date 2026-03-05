@@ -89,8 +89,9 @@ type MCPGatewayExtensionSpec struct {
 // When configured, the public key is injected into the broker deployment via the
 // TRUSTED_HEADER_PUBLIC_KEY env var.
 type TrustedHeadersKey struct {
-	// SecretName is the name of the secret containing the public key.
-	// The secret must have a data entry with key "key" containing the PEM-encoded public key.
+	// SecretName is the name of the secret containing the public key used by the broker
+	// to verify trusted-header JWTs. The secret must have a data entry with key "key"
+	// containing the PEM-encoded public key.
 	// When Generate is Enabled, the operator creates this secret.
 	// When Generate is Disabled, this secret must already exist in the namespace.
 	// +required

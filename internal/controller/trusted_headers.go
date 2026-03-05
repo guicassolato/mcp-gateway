@@ -63,6 +63,8 @@ func validateTrustedHeadersSecret(secret *corev1.Secret, secretName string) *val
 	return nil
 }
 
+// reconcileTrustedHeaders ensures the trusted-header public key secret is available.
+// When Generate is Enabled it creates an ECDSA key pair; otherwise it validates the BYO secret.
 func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension) error {
 	if mcpExt.Spec.TrustedHeadersKey == nil {
 		return nil
@@ -72,16 +74,17 @@ func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Cont
 		if err := r.reconcileGeneratedTrustedHeaders(ctx, mcpExt); err != nil {
 			return err
 		}
-		return r.setTrustedHeadersCondition(ctx, mcpExt, metav1.ConditionTrue,
+		return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionTrue,
 			mcpv1alpha1.ConditionReasonTrustedHeadersConfigured, "trusted headers key pair generated")
 	}
 
 	// BYO secret: validate it exists and has the required key
 	secretName := mcpExt.Spec.TrustedHeadersKey.SecretName
 	secret := &corev1.Secret{}
-	if err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, secret); err != nil {
+	// use direct reader to avoid cache and informer setup for secrets
+	if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, secret); err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.setTrustedHeadersCondition(ctx, mcpExt, metav1.ConditionFalse,
+			return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
 				mcpv1alpha1.ConditionReasonSecretNotFound,
 				fmt.Sprintf("secret %s not found in namespace %s", secretName, mcpExt.Namespace))
 		}
@@ -89,29 +92,40 @@ func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Cont
 	}
 
 	if valErr := validateTrustedHeadersSecret(secret, secretName); valErr != nil {
-		return r.setTrustedHeadersCondition(ctx, mcpExt, metav1.ConditionFalse,
+		return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
 			valErr.reason, valErr.message)
 	}
 
-	return r.setTrustedHeadersCondition(ctx, mcpExt, metav1.ConditionTrue,
+	return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionTrue,
 		mcpv1alpha1.ConditionReasonTrustedHeadersConfigured, "trusted headers secret validated")
 }
 
+// reconcileGeneratedTrustedHeaders creates the public and private key secrets if either is missing.
+// Both secrets are checked to handle partial failures from a previous reconcile.
 func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension) error {
 	secretName := mcpExt.Spec.TrustedHeadersKey.SecretName
+	privSecretName := secretName + "-private"
+
+	pubExists, privExists := false, false
 	existing := &corev1.Secret{}
-	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, existing)
-	if err == nil {
-		// public key secret already exists
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
+	if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, existing); err == nil {
+		pubExists = true
+	} else if !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to check trusted headers secret: %w", err)
+	}
+	if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: privSecretName, Namespace: mcpExt.Namespace}, existing); err == nil {
+		privExists = true
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to check trusted headers private secret: %w", err)
+	}
+
+	if pubExists && privExists {
+		return nil
 	}
 
 	pubSecret, privSecret, err := buildTrustedHeadersSecrets(mcpExt)
 	if err != nil {
-		if setErr := r.setTrustedHeadersCondition(ctx, mcpExt, metav1.ConditionFalse,
+		if setErr := r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
 			mcpv1alpha1.ConditionReasonKeyGenerationFailed, err.Error()); setErr != nil {
 			return setErr
 		}
@@ -126,17 +140,22 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 	}
 
 	r.log.Info("creating trusted headers key pair", "public", pubSecret.Name, "private", privSecret.Name)
-	if err := r.Create(ctx, pubSecret); err != nil {
-		return fmt.Errorf("failed to create public key secret: %w", err)
+	if !pubExists {
+		if err := r.Create(ctx, pubSecret); err != nil {
+			return fmt.Errorf("failed to create public key secret: %w", err)
+		}
 	}
-	if err := r.Create(ctx, privSecret); err != nil {
-		return fmt.Errorf("failed to create private key secret: %w", err)
+	if !privExists {
+		if err := r.Create(ctx, privSecret); err != nil {
+			return fmt.Errorf("failed to create private key secret: %w", err)
+		}
 	}
 
 	return nil
 }
 
-func (r *MCPGatewayExtensionReconciler) setTrustedHeadersCondition(_ context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension, status metav1.ConditionStatus, reason, message string) error {
+// setTrustedHeadersCondition updates the TrustedHeadersReady status condition on the MCPGatewayExtension.
+func (r *MCPGatewayExtensionReconciler) setTrustedHeadersCondition(mcpExt *mcpv1alpha1.MCPGatewayExtension, status metav1.ConditionStatus, reason, message string) error {
 	meta.SetStatusCondition(&mcpExt.Status.Conditions, metav1.Condition{
 		Type:               mcpv1alpha1.ConditionTypeTrustedHeadersReady,
 		Status:             status,
