@@ -147,7 +147,7 @@ spec:
 
 #### Spec Fields
 
-Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will be removed (clean break, as the alpha prefix indicates they are subject to change).
+Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will be removed.
 
 ```yaml
 spec:
@@ -164,7 +164,7 @@ spec:
   # how often (in seconds) the broker pings upstream MCP servers
   # +optional
   # +kubebuilder:validation:Minimum=1
-  # +kubebuilder:validation:Maximum=3600
+  # +kubebuilder:validation:Maximum=7200
   backendPingIntervalSeconds: 60
 
   # controls whether the operator manages the gateway HTTPRoute
@@ -180,12 +180,6 @@ spec:
     secretName: trusted-headers-key
     generate: true
 ```
-
-**Removed annotations** (replaced by spec fields above):
-- `kuadrant.io/alpha-gateway-public-host` → `spec.publicHost`
-- `kuadrant.io/alpha-gateway-poll-interval` → `spec.backendPingIntervalSeconds`
-- `kuadrant.io/alpha-disable-httproute` → `spec.httpRouteManagement`
-- `kuadrant.io/alpha-gateway-listener-port` → removed entirely (port derived from sectionName)
 
 ### Component Changes
 
@@ -268,7 +262,6 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
-- [x] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
 - [ ] Update installation docs based on Generate OLM bundle being done
 - [ ] Add trusted-header key pair generation (optional feature)
@@ -276,6 +269,7 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 
 
 ### Completed
+- [x] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [x] Implement HTTPRoute creation for gateway access
 - [x] Filter MCPServerRegistration config by listener (only write config to extensions whose listener matches the HTTPRoute via sectionName or hostname)
 - [x] Add MCPGatewayExtension reconcile (status, validation and resource creation)
