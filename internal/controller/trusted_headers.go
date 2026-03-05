@@ -13,7 +13,7 @@ import (
 	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 )
 
-// buildTrustedHeadersSecrets generates an ECDSA key pair and returns public and private key secrets
+// buildTrustedHeadersSecrets generates an ecdsa key pair and returns public/private secrets
 func buildTrustedHeadersSecrets(mcpExt *mcpv1alpha1.MCPGatewayExtension) (*corev1.Secret, *corev1.Secret, error) {
 	pubPEM, privPEM, err := generateECDSAKeyPair()
 	if err != nil {
@@ -49,7 +49,7 @@ func buildTrustedHeadersSecrets(mcpExt *mcpv1alpha1.MCPGatewayExtension) (*corev
 	return pubSecret, privSecret, nil
 }
 
-// validateTrustedHeadersSecret checks that a secret has the required "key" data entry
+// validateTrustedHeadersSecret checks the secret has the required "key" entry
 func validateTrustedHeadersSecret(secret *corev1.Secret, secretName string) *validationError {
 	if secret.Data == nil {
 		return newValidationError(mcpv1alpha1.ConditionReasonSecretInvalid,
@@ -62,10 +62,8 @@ func validateTrustedHeadersSecret(secret *corev1.Secret, secretName string) *val
 	return nil
 }
 
-// reconcileTrustedHeaders ensures the trusted-header public key secret is available.
-// When Generate is Enabled it creates an ECDSA key pair; otherwise it validates the BYO secret.
-// Returns *validationError for configuration issues (secret not found, invalid) and
-// regular errors for transient failures that should be retried.
+// reconcileTrustedHeaders reconciles the trusted-header public key secret;
+// generates a key pair or validates the byo secret.
 func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension) error {
 	if mcpExt.Spec.TrustedHeadersKey == nil {
 		return nil
@@ -117,6 +115,25 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 		return nil
 	}
 
+	// if only one secret exists, delete the orphan so we regenerate a matching pair
+	if pubExists && !privExists {
+		orphan := &corev1.Secret{}
+		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, orphan); err == nil {
+			r.log.Info("deleting orphaned public key secret to regenerate matching pair", "secret", secretName)
+			if err := r.Delete(ctx, orphan); err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to delete orphaned public key secret: %w", err)
+			}
+		}
+	} else if privExists && !pubExists {
+		orphan := &corev1.Secret{}
+		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: privSecretName, Namespace: mcpExt.Namespace}, orphan); err == nil {
+			r.log.Info("deleting orphaned private key secret to regenerate matching pair", "secret", privSecretName)
+			if err := r.Delete(ctx, orphan); err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to delete orphaned private key secret: %w", err)
+			}
+		}
+	}
+
 	pubSecret, privSecret, err := buildTrustedHeadersSecrets(mcpExt)
 	if err != nil {
 		return err
@@ -130,15 +147,11 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 	}
 
 	r.log.Info("creating trusted headers key pair", "public", pubSecret.Name, "private", privSecret.Name)
-	if !pubExists {
-		if err := r.Create(ctx, pubSecret); err != nil {
-			return fmt.Errorf("failed to create public key secret: %w", err)
-		}
+	if err := r.Create(ctx, pubSecret); err != nil {
+		return fmt.Errorf("failed to create public key secret: %w", err)
 	}
-	if !privExists {
-		if err := r.Create(ctx, privSecret); err != nil {
-			return fmt.Errorf("failed to create private key secret: %w", err)
-		}
+	if err := r.Create(ctx, privSecret); err != nil {
+		return fmt.Errorf("failed to create private key secret: %w", err)
 	}
 
 	return nil

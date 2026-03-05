@@ -88,6 +88,7 @@ type TrustedHeadersKey struct {
 	// When Generate is Enabled, the operator creates this secret.
 	// When Generate is Disabled, this secret must already exist in the namespace.
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	SecretName string `json:"secretName"`
 
 	// Generate controls whether the operator generates an ECDSA P-256 key pair.

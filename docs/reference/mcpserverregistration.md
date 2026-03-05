@@ -26,8 +26,8 @@
 
 | **Field** | **Type** | **Required** | **Description** |
 |-----------|----------|:------------:|-----------------|
-| `group` | String | Yes | Group of the target resource. Default: `gateway.networking.k8s.io` |
-| `kind` | String | Yes | Kind of the target resource. Default: `HTTPRoute` |
+| `group` | String | No | Group of the target resource. Default: `gateway.networking.k8s.io` |
+| `kind` | String | No | Kind of the target resource. Default: `HTTPRoute` |
 | `name` | String | Yes | Name of the target HTTPRoute |
 | `namespace` | String | No | Namespace of the target resource. Defaults to same namespace |
 

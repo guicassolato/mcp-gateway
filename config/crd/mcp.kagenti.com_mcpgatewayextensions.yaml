@@ -149,6 +149,7 @@ spec:
                       containing the PEM-encoded public key.
                       When Generate is Enabled, the operator creates this secret.
                       When Generate is Disabled, this secret must already exist in the namespace.
+                    minLength: 1
                     type: string
                 required:
                 - secretName
