@@ -136,14 +136,17 @@ spec:
                       Enabled: creates <secretName> (public key) and <secretName>-private (private key)
                       in the MCPGatewayExtension namespace with owner references.
                       Disabled: the secret must already exist (default).
+                      Changing this field requires deleting the existing secrets first to ensure
+                      the public and private keys are a matching pair.
                     enum:
                     - Enabled
                     - Disabled
                     type: string
                   secretName:
                     description: |-
-                      SecretName is the name of the secret containing the public key.
-                      The secret must have a data entry with key "key" containing the PEM-encoded public key.
+                      SecretName is the name of the secret containing the public key used by the broker
+                      to verify trusted-header JWTs. The secret must have a data entry with key "key"
+                      containing the PEM-encoded public key.
                       When Generate is Enabled, the operator creates this secret.
                       When Generate is Disabled, this secret must already exist in the namespace.
                     type: string
