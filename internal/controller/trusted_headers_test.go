@@ -76,9 +76,9 @@ func TestBuildTrustedHeadersSecrets(t *testing.T) {
 
 func TestValidateTrustedHeadersSecret(t *testing.T) {
 	tests := []struct {
-		name      string
-		secret    *corev1.Secret
-		wantErr   bool
+		name       string
+		secret     *corev1.Secret
+		wantErr    bool
 		wantReason string
 	}{
 		{
