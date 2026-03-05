@@ -184,6 +184,7 @@ func newTestReconciler() *MCPGatewayExtensionReconciler {
 		Scheme:              testK8sClient.Scheme(),
 		ConfigWriterDeleter: &mockConfigWriterDeleter{},
 		BrokerRouterImage:   DefaultBrokerRouterImage,
+		DirectAPIReader:     testK8sClient,
 		MCPExtFinderValidator: &MCPGatewayExtensionValidator{
 			Client: testIndexedClient,
 		},
@@ -970,6 +971,158 @@ var _ = Describe("MCPGatewayExtension Controller", func() {
 				}, envoyFilter)
 				g.Expect(errors.IsNotFound(err)).To(BeTrue())
 			}, testTimeout, testRetryInterval).Should(Succeed())
+		})
+	})
+
+	Context("MCPGatewayExtension TrustedHeaders", func() {
+		ctx := context.Background()
+
+		Context("when generate is Enabled", func() {
+			const resourceName = "th-gen-ext"
+			const gatewayName = "th-gen-gw"
+			const namespace = "th-gen-test"
+			const secretName = "test-keypair"
+
+			mcpExtNN := types.NamespacedName{Name: resourceName, Namespace: namespace}
+
+			BeforeEach(func() {
+				createTestNamespace(ctx, namespace)
+				gw := createTestGateway(gatewayName, namespace, "mcp.example.com")
+				Expect(testK8sClient.Create(ctx, gw)).To(Succeed())
+				refGrant := createTestReferenceGrant("allow-th-gen", namespace, namespace, nil)
+				Expect(testK8sClient.Create(ctx, refGrant)).To(Succeed())
+
+				ext := createTestMCPGatewayExtension(resourceName, namespace, gatewayName, namespace)
+				ext.Spec.TrustedHeadersKey = &mcpv1alpha1.TrustedHeadersKey{
+					SecretName: secretName,
+					Generate:   mcpv1alpha1.KeyGenerationEnabled,
+				}
+				Expect(testK8sClient.Create(ctx, ext)).To(Succeed())
+			})
+
+			AfterEach(func() {
+				forceDeleteTestMCPGatewayExtension(ctx, resourceName, namespace)
+				deleteTestGateway(ctx, gatewayName, namespace)
+				_ = deleteTestReferenceGrant(ctx, "allow-th-gen", namespace)
+				for _, n := range []string{secretName, secretName + "-private"} {
+					s := &corev1.Secret{}
+					if err := testK8sClient.Get(ctx, types.NamespacedName{Name: n, Namespace: namespace}, s); err == nil {
+						_ = testK8sClient.Delete(ctx, s)
+					}
+				}
+				deployment := &appsv1.Deployment{}
+				if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: namespace}, deployment); err == nil {
+					_ = testK8sClient.Delete(ctx, deployment)
+				}
+				service := &corev1.Service{}
+				if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: namespace}, service); err == nil {
+					_ = testK8sClient.Delete(ctx, service)
+				}
+			})
+
+			It("should generate key pair secrets when generate is Enabled", func() {
+				reconciler := newTestReconciler()
+				waitForCacheSync(ctx, mcpExtNN)
+
+				Eventually(func(g Gomega) {
+					_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: mcpExtNN})
+					g.Expect(err).NotTo(HaveOccurred())
+
+					pubSecret := &corev1.Secret{}
+					g.Expect(testK8sClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, pubSecret)).To(Succeed())
+					g.Expect(pubSecret.Data).To(HaveKey("key"))
+
+					privSecret := &corev1.Secret{}
+					g.Expect(testK8sClient.Get(ctx, types.NamespacedName{Name: secretName + "-private", Namespace: namespace}, privSecret)).To(Succeed())
+					g.Expect(privSecret.Data).To(HaveKey("key"))
+
+					deployment := &appsv1.Deployment{}
+					g.Expect(testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: namespace}, deployment)).To(Succeed())
+					containers := deployment.Spec.Template.Spec.Containers
+					g.Expect(containers).NotTo(BeEmpty())
+					var found bool
+					for _, env := range containers[0].Env {
+						if env.Name == "TRUSTED_HEADER_PUBLIC_KEY" {
+							found = true
+							g.Expect(env.ValueFrom).NotTo(BeNil())
+							g.Expect(env.ValueFrom.SecretKeyRef).NotTo(BeNil())
+							g.Expect(env.ValueFrom.SecretKeyRef.Name).To(Equal(secretName))
+							g.Expect(env.ValueFrom.SecretKeyRef.Key).To(Equal("key"))
+						}
+					}
+					g.Expect(found).To(BeTrue(), "TRUSTED_HEADER_PUBLIC_KEY env var not found")
+				}, testTimeout, testRetryInterval).Should(Succeed())
+			})
+		})
+
+		Context("when generate is Disabled and BYO secret is invalid", func() {
+			const resourceName = "th-byo-ext"
+			const gatewayName = "th-byo-gw"
+			const namespace = "th-byo-test"
+			const secretName = "byo-key"
+
+			mcpExtNN := types.NamespacedName{Name: resourceName, Namespace: namespace}
+
+			BeforeEach(func() {
+				createTestNamespace(ctx, namespace)
+				gw := createTestGateway(gatewayName, namespace, "mcp.example.com")
+				Expect(testK8sClient.Create(ctx, gw)).To(Succeed())
+				refGrant := createTestReferenceGrant("allow-th-byo", namespace, namespace, nil)
+				Expect(testK8sClient.Create(ctx, refGrant)).To(Succeed())
+
+				badSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: namespace,
+					},
+					Data: map[string][]byte{
+						"secret": []byte("wrong"),
+					},
+				}
+				Expect(testK8sClient.Create(ctx, badSecret)).To(Succeed())
+
+				ext := createTestMCPGatewayExtension(resourceName, namespace, gatewayName, namespace)
+				ext.Spec.TrustedHeadersKey = &mcpv1alpha1.TrustedHeadersKey{
+					SecretName: secretName,
+					Generate:   mcpv1alpha1.KeyGenerationDisabled,
+				}
+				Expect(testK8sClient.Create(ctx, ext)).To(Succeed())
+			})
+
+			AfterEach(func() {
+				forceDeleteTestMCPGatewayExtension(ctx, resourceName, namespace)
+				deleteTestGateway(ctx, gatewayName, namespace)
+				_ = deleteTestReferenceGrant(ctx, "allow-th-byo", namespace)
+				s := &corev1.Secret{}
+				if err := testK8sClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, s); err == nil {
+					_ = testK8sClient.Delete(ctx, s)
+				}
+				deployment := &appsv1.Deployment{}
+				if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: namespace}, deployment); err == nil {
+					_ = testK8sClient.Delete(ctx, deployment)
+				}
+				service := &corev1.Service{}
+				if err := testK8sClient.Get(ctx, types.NamespacedName{Name: brokerRouterName, Namespace: namespace}, service); err == nil {
+					_ = testK8sClient.Delete(ctx, service)
+				}
+			})
+
+			It("should report error when BYO secret is missing required key", func() {
+				reconciler := newTestReconciler()
+				waitForCacheSync(ctx, mcpExtNN)
+
+				Eventually(func(g Gomega) {
+					_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: mcpExtNN})
+					g.Expect(err).NotTo(HaveOccurred())
+
+					updated := &mcpv1alpha1.MCPGatewayExtension{}
+					g.Expect(testK8sClient.Get(ctx, mcpExtNN, updated)).To(Succeed())
+					condition := meta.FindStatusCondition(updated.Status.Conditions, mcpv1alpha1.ConditionTypeTrustedHeadersReady)
+					g.Expect(condition).NotTo(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+					g.Expect(condition.Reason).To(Equal(mcpv1alpha1.ConditionReasonSecretInvalid))
+				}, testTimeout, testRetryInterval).Should(Succeed())
+			})
 		})
 	})
 
