@@ -77,6 +77,10 @@ ginkgo run -v --tags=e2e --focus="test description" tests/e2e/
 - EnvoyFilter creation by controller
 - Resource/prompt federation (only tools currently)
 
+## Documentation
+
+- When adding or changing CRD fields in `api/v1alpha1/`, update the corresponding API reference doc in `docs/reference/` to reflect the change.
+
 ## Code Style
 
 - Minimal, terse comments (lowercase, only when necessary)

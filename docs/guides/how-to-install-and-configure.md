@@ -87,6 +87,8 @@ The **EnvoyFilter** is configured to intercept traffic on the listener's port an
 
 The **configuration secret** only contains MCP server entries for MCPServerRegistrations whose HTTPRoutes attach to the same listener. This ensures team isolation when multiple teams share a single Gateway with different listeners.
 
+For full details on all MCPGatewayExtension spec fields, see the [MCPGatewayExtension API Reference](../reference/mcpgatewayextension.md).
+
 ## Post-Installation Configuration
 
 After installation, the controller automatically creates the HTTPRoute for gateway access. You can connect your MCP servers:
@@ -95,6 +97,12 @@ After installation, the controller automatically creates the HTTPRoute for gatew
 2. **[Connect to External MCP Servers](./external-mcp-server.md)** - Connect to external APIs
 
 If you need to customize the HTTPRoute (e.g. add CORS headers), see [Configure Gateway Listener and Route](./configure-mcp-gateway-listener-and-router.md).
+
+## API Reference
+
+- [MCPGatewayExtension](../reference/mcpgatewayextension.md)
+- [MCPServerRegistration](../reference/mcpserverregistration.md)
+- [MCPVirtualServer](../reference/mcpvirtualserver.md)
 
 ## Optional Configuration
 

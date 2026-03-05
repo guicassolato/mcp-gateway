@@ -91,6 +91,12 @@ To stop the services and clean up:
 kind delete cluster
 ```
 
+## API Reference
+
+- [MCPGatewayExtension](../reference/mcpgatewayextension.md)
+- [MCPServerRegistration](../reference/mcpserverregistration.md)
+- [MCPVirtualServer](../reference/mcpvirtualserver.md)
+
 ## Next Steps
 
 Now that you have MCP Gateway running, explore other features:

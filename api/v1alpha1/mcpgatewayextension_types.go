@@ -101,6 +101,8 @@ type TrustedHeadersKey struct {
 	// Enabled: creates <secretName> (public key) and <secretName>-private (private key)
 	// in the MCPGatewayExtension namespace with owner references.
 	// Disabled: the secret must already exist (default).
+	// Changing this field requires deleting the existing secrets first to ensure
+	// the public and private keys are a matching pair.
 	// +optional
 	// +kubebuilder:default=Disabled
 	Generate KeyGenerationPolicy `json:"generate,omitempty"`
