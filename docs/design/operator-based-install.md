@@ -147,7 +147,7 @@ spec:
 
 #### Spec Fields
 
-Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will be removed.
+Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will have been removed.
 
 ```yaml
 spec:
