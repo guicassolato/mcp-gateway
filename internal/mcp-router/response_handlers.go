@@ -3,6 +3,7 @@ package mcprouter
 import (
 	"context"
 
+	extprochttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
 	eppb "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 )
 
@@ -31,6 +32,14 @@ func (s *ExtProcServer) HandleResponseHeaders(ctx context.Context, responseHeade
 		}
 	}
 
-	return response.WithResponseHeaderResponse(responseHeaderBuilder.Build()).Build(), nil
+	responses := response.WithResponseHeaderResponse(responseHeaderBuilder.Build()).Build()
 
+	// for tool calls, switch to STREAMED response body so we can intercept elicitation/create events in the SSE stream
+	if req != nil && req.isToolCall() {
+		responses[0].ModeOverride = &extprochttp.ProcessingMode{
+			ResponseBodyMode: extprochttp.ProcessingMode_STREAMED,
+		}
+	}
+
+	return responses, nil
 }
