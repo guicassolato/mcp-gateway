@@ -6,7 +6,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -65,17 +64,15 @@ func validateTrustedHeadersSecret(secret *corev1.Secret, secretName string) *val
 
 // reconcileTrustedHeaders ensures the trusted-header public key secret is available.
 // When Generate is Enabled it creates an ECDSA key pair; otherwise it validates the BYO secret.
+// Returns *validationError for configuration issues (secret not found, invalid) and
+// regular errors for transient failures that should be retried.
 func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension) error {
 	if mcpExt.Spec.TrustedHeadersKey == nil {
 		return nil
 	}
 
 	if mcpExt.Spec.TrustedHeadersKey.Generate == mcpv1alpha1.KeyGenerationEnabled {
-		if err := r.reconcileGeneratedTrustedHeaders(ctx, mcpExt); err != nil {
-			return err
-		}
-		return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionTrue,
-			mcpv1alpha1.ConditionReasonTrustedHeadersConfigured, "trusted headers key pair generated")
+		return r.reconcileGeneratedTrustedHeaders(ctx, mcpExt)
 	}
 
 	// BYO secret: validate it exists and has the required key
@@ -84,20 +81,17 @@ func (r *MCPGatewayExtensionReconciler) reconcileTrustedHeaders(ctx context.Cont
 	// use direct reader to avoid cache and informer setup for secrets
 	if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, secret); err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
-				mcpv1alpha1.ConditionReasonSecretNotFound,
+			return newValidationError(mcpv1alpha1.ConditionReasonSecretNotFound,
 				fmt.Sprintf("secret %s not found in namespace %s", secretName, mcpExt.Namespace))
 		}
 		return fmt.Errorf("failed to get trusted headers secret: %w", err)
 	}
 
 	if valErr := validateTrustedHeadersSecret(secret, secretName); valErr != nil {
-		return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
-			valErr.reason, valErr.message)
+		return valErr
 	}
 
-	return r.setTrustedHeadersCondition(mcpExt, metav1.ConditionTrue,
-		mcpv1alpha1.ConditionReasonTrustedHeadersConfigured, "trusted headers secret validated")
+	return nil
 }
 
 // reconcileGeneratedTrustedHeaders creates the public and private key secrets if either is missing.
@@ -125,10 +119,6 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 
 	pubSecret, privSecret, err := buildTrustedHeadersSecrets(mcpExt)
 	if err != nil {
-		if setErr := r.setTrustedHeadersCondition(mcpExt, metav1.ConditionFalse,
-			mcpv1alpha1.ConditionReasonKeyGenerationFailed, err.Error()); setErr != nil {
-			return setErr
-		}
 		return err
 	}
 
@@ -151,17 +141,5 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 		}
 	}
 
-	return nil
-}
-
-// setTrustedHeadersCondition updates the TrustedHeadersReady status condition on the MCPGatewayExtension.
-func (r *MCPGatewayExtensionReconciler) setTrustedHeadersCondition(mcpExt *mcpv1alpha1.MCPGatewayExtension, status metav1.ConditionStatus, reason, message string) error {
-	meta.SetStatusCondition(&mcpExt.Status.Conditions, metav1.Condition{
-		Type:               mcpv1alpha1.ConditionTypeTrustedHeadersReady,
-		Status:             status,
-		ObservedGeneration: mcpExt.Generation,
-		Reason:             reason,
-		Message:            message,
-	})
 	return nil
 }

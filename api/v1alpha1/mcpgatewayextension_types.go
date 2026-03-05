@@ -27,17 +27,10 @@ const (
 	// ConditionReasonDeploymentNotReady is the reason when the broker-router deployment is not ready
 	ConditionReasonDeploymentNotReady = "DeploymentNotReady"
 
-	// ConditionTypeTrustedHeadersReady signals if trusted headers key is configured
-	ConditionTypeTrustedHeadersReady = "TrustedHeadersReady"
 	// ConditionReasonSecretNotFound is the reason when the trusted headers secret is missing
 	ConditionReasonSecretNotFound = "SecretNotFound"
 	// ConditionReasonSecretInvalid is the reason when the secret lacks the required key
 	ConditionReasonSecretInvalid = "SecretInvalid"
-	// ConditionReasonKeyGenerationFailed is the reason when key generation fails
-	ConditionReasonKeyGenerationFailed = "KeyGenerationFailed"
-	// ConditionReasonTrustedHeadersConfigured is the reason when trusted headers are ready
-	ConditionReasonTrustedHeadersConfigured = "TrustedHeadersConfigured"
-
 	// HTTPRouteManagementEnabled means the operator creates and manages the HTTPRoute
 	HTTPRouteManagementEnabled HTTPRouteManagementPolicy = "Enabled"
 	// HTTPRouteManagementDisabled means the operator does not create an HTTPRoute

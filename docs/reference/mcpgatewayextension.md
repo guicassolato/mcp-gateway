@@ -51,8 +51,7 @@
 
 | **Type** | **Description** |
 |----------|-----------------|
-| `Ready` | Indicates whether the broker-router deployment is running and the EnvoyFilter has been applied to the target Gateway |
-| `TrustedHeadersReady` | Indicates whether the trusted headers key is configured and valid |
+| `Ready` | Indicates whether the MCPGatewayExtension is fully configured: the broker-router deployment is running, the EnvoyFilter has been applied, and trusted headers (if configured) are valid |
 
 ### Condition Reasons
 
@@ -64,5 +63,3 @@
 | `DeploymentNotReady` | The broker-router deployment is not ready |
 | `SecretNotFound` | The trusted headers secret is missing |
 | `SecretInvalid` | The trusted headers secret lacks the required `key` data entry |
-| `KeyGenerationFailed` | Key pair generation failed |
-| `TrustedHeadersConfigured` | Trusted headers key is configured and valid |

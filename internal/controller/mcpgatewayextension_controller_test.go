@@ -1117,7 +1117,7 @@ var _ = Describe("MCPGatewayExtension Controller", func() {
 
 					updated := &mcpv1alpha1.MCPGatewayExtension{}
 					g.Expect(testK8sClient.Get(ctx, mcpExtNN, updated)).To(Succeed())
-					condition := meta.FindStatusCondition(updated.Status.Conditions, mcpv1alpha1.ConditionTypeTrustedHeadersReady)
+					condition := meta.FindStatusCondition(updated.Status.Conditions, mcpv1alpha1.ConditionTypeReady)
 					g.Expect(condition).NotTo(BeNil())
 					g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
 					g.Expect(condition.Reason).To(Equal(mcpv1alpha1.ConditionReasonSecretInvalid))
