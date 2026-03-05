@@ -56,10 +56,10 @@ kubectl get httproute mcp-gateway-route -n mcp-system
 
 If you need a custom HTTPRoute (e.g. with CORS headers, additional path rules, or OAuth well-known endpoints), disable automatic creation and manage your own:
 
-1. Add the annotation to your MCPGatewayExtension:
+1. Set `httpRouteManagement: Disabled` on your MCPGatewayExtension:
    ```bash
-   kubectl annotate mcpgatewayextension -n mcp-system your-extension-name \
-     kuadrant.io/alpha-disable-httproute=true
+   kubectl patch mcpgatewayextension -n mcp-system your-extension-name \
+     --type merge -p '{"spec":{"httpRouteManagement":"Disabled"}}'
    ```
 
 2. Delete the previously auto-created HTTPRoute if it exists:

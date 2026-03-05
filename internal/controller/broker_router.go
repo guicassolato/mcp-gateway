@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -59,17 +58,9 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 	command := []string{"./mcp_gateway", fmt.Sprintf("--mcp-broker-public-address=0.0.0.0:%d", brokerHTTPPort),
 		"--mcp-gateway-private-host=" + internalHost,
 		"--mcp-gateway-config=/config/config.yaml"}
-	// annotation takes precedence over reconciler default
-	pollInterval := mcpExt.PollInterval()
-	if pollInterval == "" {
-		pollInterval = r.BrokerPollInterval
-	}
-	if pollInterval != "" {
-		// the flag expects seconds as a plain number; parse duration strings like "60s" or "5m"
-		if d, err := time.ParseDuration(pollInterval); err == nil {
-			pollInterval = fmt.Sprintf("%d", int64(d.Seconds()))
-		}
-		command = append(command, "--mcp-check-interval="+pollInterval)
+	// only override the binary's default (60s) when explicitly set in spec
+	if mcpExt.Spec.BackendPingIntervalSeconds != nil {
+		command = append(command, fmt.Sprintf("--mcp-check-interval=%d", *mcpExt.Spec.BackendPingIntervalSeconds))
 	}
 	command = append(command, "--mcp-gateway-public-host="+publicHost)
 	command = append(command, "--mcp-router-key="+routerKey(mcpExt))
@@ -230,7 +221,7 @@ func derivePublicHost(listenerConfig *mcpv1alpha1.ListenerConfig, annotationOver
 
 func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension, listenerConfig *mcpv1alpha1.ListenerConfig) (bool, error) {
 	// derive values from listener config before building resources
-	publicHost, err := derivePublicHost(listenerConfig, mcpExt.PublicHost())
+	publicHost, err := derivePublicHost(listenerConfig, mcpExt.Spec.PublicHost)
 	if err != nil {
 		return false, newValidationError(mcpv1alpha1.ConditionReasonInvalid, err.Error())
 	}
@@ -313,7 +304,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 		}
 	}
 
-	// reconcile gateway HTTPRoute (unless disabled by annotation)
+	// reconcile gateway HTTPRoute (unless disabled by spec)
 	if !mcpExt.HTTPRouteDisabled() {
 		httpRoute := r.buildGatewayHTTPRoute(mcpExt, publicHost)
 		if err := controllerutil.SetControllerReference(mcpExt, httpRoute, r.Scheme); err != nil {

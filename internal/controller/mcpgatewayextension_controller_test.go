@@ -1050,24 +1050,21 @@ var _ = Describe("MCPGatewayExtension Controller", func() {
 			Expect(httpRoute.OwnerReferences[0].UID).To(Equal(mcpExt.UID))
 		})
 
-		It("should not create HTTPRoute when disabled by annotation", func() {
-			// add the disable annotation before reconciling
+		It("should not create HTTPRoute when disabled by spec", func() {
+			// set HTTPRouteManagement to Disabled before reconciling
 			ext := &mcpv1alpha1.MCPGatewayExtension{}
 			Expect(testK8sClient.Get(ctx, mcpExtNamespacedName, ext)).To(Succeed())
-			if ext.Annotations == nil {
-				ext.Annotations = map[string]string{}
-			}
-			ext.Annotations[mcpv1alpha1.AnnotationDisableHTTPRoute] = "true"
+			ext.Spec.HTTPRouteManagement = mcpv1alpha1.HTTPRouteManagementDisabled
 			Expect(testK8sClient.Update(ctx, ext)).To(Succeed())
 
 			reconciler := newTestReconciler()
 			waitForCacheSync(ctx, mcpExtNamespacedName)
 
-			// wait for cache to see the annotation update
+			// wait for cache to see the spec update
 			Eventually(func(g Gomega) {
 				cached := &mcpv1alpha1.MCPGatewayExtension{}
 				g.Expect(testIndexedClient.Get(ctx, mcpExtNamespacedName, cached)).To(Succeed())
-				g.Expect(cached.Annotations[mcpv1alpha1.AnnotationDisableHTTPRoute]).To(Equal("true"))
+				g.Expect(cached.Spec.HTTPRouteManagement).To(Equal(mcpv1alpha1.HTTPRouteManagementDisabled))
 			}, testTimeout, testRetryInterval).Should(Succeed())
 
 			// reconcile multiple times to ensure HTTPRoute is never created

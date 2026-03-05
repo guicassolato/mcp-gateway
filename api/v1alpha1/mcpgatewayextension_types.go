@@ -2,11 +2,14 @@ package v1alpha1
 
 import (
 	"fmt"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// HTTPRouteManagementPolicy defines how the operator manages the gateway HTTPRoute
+// +kubebuilder:validation:Enum=Enabled;Disabled
+type HTTPRouteManagementPolicy string
 
 const (
 	// ConditionTypeReady signals if a resource is ready
@@ -20,18 +23,10 @@ const (
 	// ConditionReasonDeploymentNotReady is the reason when the broker-router deployment is not ready
 	ConditionReasonDeploymentNotReady = "DeploymentNotReady"
 
-	// AnnotationPublicHost overrides the public host for the MCP Gateway broker-router. Note this a temporary annotation and you should expect it to be removed in a future release
-	AnnotationPublicHost = "kuadrant.io/alpha-gateway-public-host"
-	// AnnotationPollInterval overrides how often the broker pings upstream MCP servers. Note this a temporary annotation and you should expect it to be removed in a future release
-	AnnotationPollInterval = "kuadrant.io/alpha-gateway-poll-interval"
-	// AnnotationListenerPort specifies the Gateway listener port for the EnvoyFilter to target. Note this a temporary annotation and you should expect it to be removed in a future release
-	AnnotationListenerPort = "kuadrant.io/alpha-gateway-listener-port"
-	// AnnotationDisableHTTPRoute when set to "true" disables automatic HTTPRoute creation.
-	// Use this when you need to manage your own HTTPRoute (e.g. with CORS headers or custom filters).
-	AnnotationDisableHTTPRoute = "kuadrant.io/alpha-disable-httproute"
-
-	// DefaultListenerPort is the default port used when no annotation is specified
-	DefaultListenerPort = 8080
+	// HTTPRouteManagementEnabled means the operator creates and manages the HTTPRoute
+	HTTPRouteManagementEnabled HTTPRouteManagementPolicy = "Enabled"
+	// HTTPRouteManagementDisabled means the operator does not create an HTTPRoute
+	HTTPRouteManagementDisabled HTTPRouteManagementPolicy = "Disabled"
 )
 
 // MCPGatewayExtensionSpec defines the desired state of MCPGatewayExtension.
@@ -39,6 +34,30 @@ type MCPGatewayExtensionSpec struct {
 	// TargetRef specifies the Gateway to extend with MCP protocol support.
 	// The controller will create an EnvoyFilter targeting this Gateway's Envoy proxy.
 	TargetRef MCPGatewayExtensionTargetReference `json:"targetRef"`
+
+	// PublicHost overrides the public host derived from the listener hostname.
+	// Use when the listener has a wildcard and you need a specific host.
+	// +optional
+	PublicHost string `json:"publicHost,omitempty"`
+
+	// PrivateHost overrides the internal host used for hair-pinning requests
+	// back through the gateway. Defaults to <gateway>-istio.<ns>.svc.cluster.local:<port>.
+	// +optional
+	PrivateHost string `json:"privateHost,omitempty"`
+
+	// BackendPingIntervalSeconds specifies how often the broker pings upstream MCP servers.
+	// +optional
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=7200
+	// +kubebuilder:default=60
+	BackendPingIntervalSeconds *int32 `json:"backendPingIntervalSeconds,omitempty"`
+
+	// HTTPRouteManagement controls whether the operator manages the gateway HTTPRoute.
+	// Enabled: creates and manages the HTTPRoute (default).
+	// Disabled: does not create an HTTPRoute.
+	// +optional
+	// +kubebuilder:default=Enabled
+	HTTPRouteManagement HTTPRouteManagementPolicy `json:"httpRouteManagement,omitempty"`
 }
 
 // MCPGatewayExtensionStatus defines the observed state of MCPGatewayExtension.
@@ -136,16 +155,11 @@ func (m *MCPGatewayExtension) SetReadyCondition(status metav1.ConditionStatus, r
 	})
 }
 
-// PublicHost returns the public host override from annotations, or empty string if not set
-func (m *MCPGatewayExtension) PublicHost() string {
-	if m.Annotations == nil {
-		return ""
-	}
-	return m.Annotations[AnnotationPublicHost]
-}
-
 // InternalHost returns the internal/private host computed from the targetRef
 func (m *MCPGatewayExtension) InternalHost(port uint32) string {
+	if m.Spec.PrivateHost != "" {
+		return m.Spec.PrivateHost
+	}
 	gatewayNamespace := m.Spec.TargetRef.Namespace
 	if gatewayNamespace == "" {
 		gatewayNamespace = m.Namespace
@@ -153,37 +167,9 @@ func (m *MCPGatewayExtension) InternalHost(port uint32) string {
 	return fmt.Sprintf(m.Spec.TargetRef.Name+"-istio."+gatewayNamespace+".svc.cluster.local:%v", port)
 }
 
-// PollInterval returns the upstream MCP server ping interval from annotations, or empty string if not set
-func (m *MCPGatewayExtension) PollInterval() string {
-	if m.Annotations == nil {
-		return ""
-	}
-	return m.Annotations[AnnotationPollInterval]
-}
-
-// ListenerPort returns the Gateway listener port from annotations, or DefaultListenerPort if not set or invalid
-// Deprecated: Use ListenerConfig from the Gateway instead
-func (m *MCPGatewayExtension) ListenerPort() uint32 {
-	if m.Annotations == nil {
-		return DefaultListenerPort
-	}
-	portStr, ok := m.Annotations[AnnotationListenerPort]
-	if !ok || portStr == "" {
-		return DefaultListenerPort
-	}
-	port, err := strconv.ParseUint(portStr, 10, 32)
-	if err != nil {
-		return DefaultListenerPort
-	}
-	return uint32(port)
-}
-
-// HTTPRouteDisabled returns true if the disable-httproute annotation is set to "true"
+// HTTPRouteDisabled returns true if HTTPRouteManagement is set to Disabled
 func (m *MCPGatewayExtension) HTTPRouteDisabled() bool {
-	if m.Annotations == nil {
-		return false
-	}
-	return m.Annotations[AnnotationDisableHTTPRoute] == "true"
+	return m.Spec.HTTPRouteManagement == HTTPRouteManagementDisabled
 }
 
 // ListenerConfig holds configuration extracted from a Gateway listener

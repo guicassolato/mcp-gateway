@@ -109,7 +109,6 @@ type MCPGatewayExtensionReconciler struct {
 	ConfigWriterDeleter   ConfigWriterDeleter
 	MCPExtFinderValidator MCPGatewayExtensionFinderValidator
 	BrokerRouterImage     string
-	BrokerPollInterval    string // default interval for pinging upstream MCP servers
 }
 
 // +kubebuilder:rbac:groups=mcp.kagenti.com,resources=mcpgatewayextensions,verbs=get;list;watch;create;update;patch;delete
@@ -255,11 +254,11 @@ func (r *MCPGatewayExtensionReconciler) validateGatewayTarget(ctx context.Contex
 		return nil, nil, err
 	}
 
-	// a resolvable hostname is required: either the listener must have one or the public host annotation must be set
-	if listenerConfig.Hostname == "" && mcpExt.PublicHost() == "" {
+	// a resolvable hostname is required: either the listener must have one or spec.publicHost must be set
+	if listenerConfig.Hostname == "" && mcpExt.Spec.PublicHost == "" {
 		return nil, nil, newValidationError(mcpv1alpha1.ConditionReasonInvalid,
-			fmt.Sprintf("listener %q on gateway %s/%s has no hostname and no %s annotation is set",
-				mcpExt.Spec.TargetRef.SectionName, targetGateway.Namespace, targetGateway.Name, mcpv1alpha1.AnnotationPublicHost))
+			fmt.Sprintf("listener %q on gateway %s/%s has no hostname and spec.publicHost is not set",
+				mcpExt.Spec.TargetRef.SectionName, targetGateway.Namespace, targetGateway.Name))
 	}
 
 	// fetch the namespace directly to avoid setting up an informer via the cached client

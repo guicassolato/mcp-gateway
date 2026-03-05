@@ -684,7 +684,7 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 		Expect(v.HTTPRouteHasOwnerReference(routeName, extNamespace, extName)).To(Succeed())
 	})
 
-	It("[Happy] MCPGatewayExtension with disable-httproute annotation skips HTTPRoute creation", func() {
+	It("[Happy] MCPGatewayExtension with httpRouteManagement Disabled skips HTTPRoute creation", func() {
 		const (
 			extName      = "no-httproute-ext"
 			extNamespace = "no-httproute-test"
@@ -693,7 +693,7 @@ var _ = Describe("MCP Gateway Multi-Gateway", func() {
 
 		ctx := context.Background()
 
-		By("Setting up MCPGatewayExtension with disable-httproute annotation")
+		By("Setting up MCPGatewayExtension with httpRouteManagement Disabled")
 		setup := NewMCPGatewayExtensionSetup(k8sClient).
 			WithName(extName).
 			InNamespace(extNamespace).

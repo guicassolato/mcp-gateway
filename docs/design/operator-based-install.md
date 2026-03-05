@@ -147,13 +147,36 @@ spec:
 
 #### Spec Fields
 
-Some flags will also be able to be set via the `MCPGatewayExtension` resource if needed:
+Configuration that was previously set via annotations will move to proper spec fields. The existing `kuadrant.io/alpha-*` annotations will have been removed.
 
 ```yaml
 spec:
-  publicHost: kuadrant.mcp-gateway.mcp # overrides the default from the listener (example if it is a wildcard)
-  backendPingIntervalSeconds: 60 #how often the gateway connects and checks the backend MCP server
-  trustedHeadersKey: # will trigger mount of secret into gateway and generate a key pair to use
+  # overrides the public host derived from the listener hostname
+  # use when the listener has a wildcard and you need a specific host
+  # +optional
+  publicHost: kuadrant.mcp-gateway.mcp
+
+  # overrides the private/internal host used for hair-pinning requests back through the gateway
+  # defaults to <gateway>-istio.<ns>.svc.cluster.local:<port>
+  # +optional
+  privateHost: mcp-gateway-istio.gateway-system.svc.cluster.local:8080
+
+  # how often (in seconds) the broker pings upstream MCP servers
+  # +optional
+  # +kubebuilder:validation:Minimum=1
+  # +kubebuilder:validation:Maximum=7200
+  backendPingIntervalSeconds: 60
+
+  # controls whether the operator manages the gateway HTTPRoute
+  # Enabled: creates and manages the HTTPRoute (default)
+  # Disabled: does not create an HTTPRoute
+  # +optional
+  # +kubebuilder:default=Enabled
+  # +kubebuilder:validation:Enum=Enabled;Disabled
+  httpRouteManagement: Enabled
+
+  # will trigger mount of secret into gateway and generate a key pair to use (separate TODO)
+  trustedHeadersKey:
     secretName: trusted-headers-key
     generate: true
 ```
@@ -239,7 +262,6 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 ## Execution
 
 ### Todo
-- [ ] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [ ] Generate OLM bundle (CatalogSource, Package, Bundle metadata)
 - [ ] Update installation docs based on Generate OLM bundle being done
 - [ ] Add trusted-header key pair generation (optional feature)
@@ -247,6 +269,7 @@ As this proposed change will allow teams to share a common ingress gateway, ther
 
 
 ### Completed
+- [x] Add MCPGatewayExtension spec properties based on the annotations and definition here
 - [x] Implement HTTPRoute creation for gateway access
 - [x] Filter MCPServerRegistration config by listener (only write config to extensions whose listener matches the HTTPRoute via sectionName or hostname)
 - [x] Add MCPGatewayExtension reconcile (status, validation and resource creation)

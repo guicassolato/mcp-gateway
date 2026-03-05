@@ -21,8 +21,8 @@ controller:
 
 # Broker configuration (applied to broker-router deployed by controller)
 broker:
-  # Poll interval in seconds for MCP server health checks
-  pollInterval: "60"
+  # How often (in seconds) the broker pings upstream MCP servers
+  pollInterval: 60
 
 # Gateway configuration
 gateway:
