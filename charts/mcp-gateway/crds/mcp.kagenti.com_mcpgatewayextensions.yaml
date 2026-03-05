@@ -124,6 +124,32 @@ spec:
                 - name
                 - sectionName
                 type: object
+              trustedHeadersKey:
+                description: |-
+                  TrustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
+                  When set, the public key secret is wired into the broker deployment.
+                properties:
+                  generate:
+                    default: Disabled
+                    description: |-
+                      Generate controls whether the operator generates an ECDSA P-256 key pair.
+                      Enabled: creates <secretName> (public key) and <secretName>-private (private key)
+                      in the MCPGatewayExtension namespace with owner references.
+                      Disabled: the secret must already exist (default).
+                    enum:
+                    - Enabled
+                    - Disabled
+                    type: string
+                  secretName:
+                    description: |-
+                      SecretName is the name of the secret containing the public key.
+                      The secret must have a data entry with key "key" containing the PEM-encoded public key.
+                      When Generate is Enabled, the operator creates this secret.
+                      When Generate is Disabled, this secret must already exist in the namespace.
+                    type: string
+                required:
+                - secretName
+                type: object
             required:
             - targetRef
             type: object
