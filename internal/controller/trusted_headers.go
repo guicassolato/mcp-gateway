@@ -118,7 +118,11 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 	// if only one secret exists, delete the orphan so we regenerate a matching pair
 	if pubExists && !privExists {
 		orphan := &corev1.Secret{}
-		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, orphan); err == nil {
+		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: secretName, Namespace: mcpExt.Namespace}, orphan); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get orphaned public key secret: %w", err)
+			}
+		} else {
 			r.log.Info("deleting orphaned public key secret to regenerate matching pair", "secret", secretName)
 			if err := r.Delete(ctx, orphan); err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("failed to delete orphaned public key secret: %w", err)
@@ -126,7 +130,11 @@ func (r *MCPGatewayExtensionReconciler) reconcileGeneratedTrustedHeaders(ctx con
 		}
 	} else if privExists && !pubExists {
 		orphan := &corev1.Secret{}
-		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: privSecretName, Namespace: mcpExt.Namespace}, orphan); err == nil {
+		if err := r.DirectAPIReader.Get(ctx, client.ObjectKey{Name: privSecretName, Namespace: mcpExt.Namespace}, orphan); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get orphaned private key secret: %w", err)
+			}
+		} else {
 			r.log.Info("deleting orphaned private key secret to regenerate matching pair", "secret", privSecretName)
 			if err := r.Delete(ctx, orphan); err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("failed to delete orphaned private key secret: %w", err)
