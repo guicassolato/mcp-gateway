@@ -1,5 +1,4 @@
 # New Words
-Valkey
 apiservicedefinitions
 catalogsource
 clusterserviceversion
@@ -396,4 +395,4 @@ operatorframework
 Valkey
 mkdocs
 diataxis
-
+Failf
