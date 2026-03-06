@@ -11,6 +11,10 @@ import (
 // +kubebuilder:validation:Enum=Enabled;Disabled
 type HTTPRouteManagementPolicy string
 
+// KeyGenerationPolicy defines whether the operator generates an ECDSA P-256 key pair
+// +kubebuilder:validation:Enum=Enabled;Disabled
+type KeyGenerationPolicy string
+
 const (
 	// ConditionTypeReady signals if a resource is ready
 	ConditionTypeReady = "Ready"
@@ -23,10 +27,19 @@ const (
 	// ConditionReasonDeploymentNotReady is the reason when the broker-router deployment is not ready
 	ConditionReasonDeploymentNotReady = "DeploymentNotReady"
 
+	// ConditionReasonSecretNotFound is the reason when the trusted headers secret is missing
+	ConditionReasonSecretNotFound = "SecretNotFound"
+	// ConditionReasonSecretInvalid is the reason when the secret lacks the required key
+	ConditionReasonSecretInvalid = "SecretInvalid"
 	// HTTPRouteManagementEnabled means the operator creates and manages the HTTPRoute
 	HTTPRouteManagementEnabled HTTPRouteManagementPolicy = "Enabled"
 	// HTTPRouteManagementDisabled means the operator does not create an HTTPRoute
 	HTTPRouteManagementDisabled HTTPRouteManagementPolicy = "Disabled"
+
+	// KeyGenerationEnabled means the operator generates an ECDSA P-256 key pair
+	KeyGenerationEnabled KeyGenerationPolicy = "Enabled"
+	// KeyGenerationDisabled means the operator does not generate keys
+	KeyGenerationDisabled KeyGenerationPolicy = "Disabled"
 )
 
 // MCPGatewayExtensionSpec defines the desired state of MCPGatewayExtension.
@@ -52,12 +65,41 @@ type MCPGatewayExtensionSpec struct {
 	// +kubebuilder:default=60
 	BackendPingIntervalSeconds *int32 `json:"backendPingIntervalSeconds,omitempty"`
 
+	// TrustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
+	// When set, the public key secret is wired into the broker deployment.
+	// +optional
+	TrustedHeadersKey *TrustedHeadersKey `json:"trustedHeadersKey,omitempty"`
+
 	// HTTPRouteManagement controls whether the operator manages the gateway HTTPRoute.
 	// Enabled: creates and manages the HTTPRoute (default).
 	// Disabled: does not create an HTTPRoute.
 	// +optional
 	// +kubebuilder:default=Enabled
 	HTTPRouteManagement HTTPRouteManagementPolicy `json:"httpRouteManagement,omitempty"`
+}
+
+// TrustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
+// When configured, the public key is injected into the broker deployment via the
+// TRUSTED_HEADER_PUBLIC_KEY env var.
+type TrustedHeadersKey struct {
+	// SecretName is the name of the secret containing the public key used by the broker
+	// to verify trusted-header JWTs. The secret must have a data entry with key "key"
+	// containing the PEM-encoded public key.
+	// When Generate is Enabled, the operator creates this secret.
+	// When Generate is Disabled, this secret must already exist in the namespace.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	SecretName string `json:"secretName"`
+
+	// Generate controls whether the operator generates an ECDSA P-256 key pair.
+	// Enabled: creates <secretName> (public key) and <secretName>-private (private key)
+	// in the MCPGatewayExtension namespace with owner references.
+	// Disabled: the secret must already exist (default).
+	// Changing this field requires deleting the existing secrets first to ensure
+	// the public and private keys are a matching pair.
+	// +optional
+	// +kubebuilder:default=Disabled
+	Generate KeyGenerationPolicy `json:"generate,omitempty"`
 }
 
 // MCPGatewayExtensionStatus defines the observed state of MCPGatewayExtension.

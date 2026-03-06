@@ -184,6 +184,25 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "env var added",
+			modify: func(d *appsv1.Deployment) {
+				d.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "TRUSTED_HEADER_PUBLIC_KEY",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "my-secret",
+								},
+								Key: "key",
+							},
+						},
+					},
+				}
+			},
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -585,6 +604,77 @@ func TestBuildBrokerRouterDeployment_RouterKey(t *testing.T) {
 	}
 	if keyValue == keyValue3 {
 		t.Errorf("expected different key for different UID, both got %q", keyValue)
+	}
+}
+
+func TestBuildBrokerRouterDeployment_TrustedHeadersKey(t *testing.T) {
+	tests := []struct {
+		name             string
+		trustedHeaderKey *mcpv1alpha1.TrustedHeadersKey
+		wantEnvVar       bool
+		wantSecretName   string
+	}{
+		{
+			name:             "no env var when TrustedHeadersKey is nil",
+			trustedHeaderKey: nil,
+			wantEnvVar:       false,
+		},
+		{
+			name: "env var set when TrustedHeadersKey has SecretName",
+			trustedHeaderKey: &mcpv1alpha1.TrustedHeadersKey{
+				SecretName: "my-trusted-key-secret",
+			},
+			wantEnvVar:     true,
+			wantSecretName: "my-trusted-key-secret",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &MCPGatewayExtensionReconciler{
+				BrokerRouterImage: "test-image:v1",
+			}
+			mcpExt := &mcpv1alpha1.MCPGatewayExtension{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ext",
+					Namespace: "test-ns",
+				},
+				Spec: mcpv1alpha1.MCPGatewayExtensionSpec{
+					TrustedHeadersKey: tt.trustedHeaderKey,
+					TargetRef: mcpv1alpha1.MCPGatewayExtensionTargetReference{
+						Name:      "my-gateway",
+						Namespace: "gateway-system",
+					},
+				},
+			}
+
+			deployment := r.buildBrokerRouterDeployment(mcpExt, "mcp.example.com", mcpExt.InternalHost(8080))
+			container := deployment.Spec.Template.Spec.Containers[0]
+
+			if !tt.wantEnvVar {
+				if len(container.Env) != 0 {
+					t.Errorf("expected no env vars, got %+v", container.Env)
+				}
+				return
+			}
+
+			if len(container.Env) != 1 {
+				t.Fatalf("expected 1 env var, got %d", len(container.Env))
+			}
+			env := container.Env[0]
+			if env.Name != "TRUSTED_HEADER_PUBLIC_KEY" {
+				t.Errorf("expected env var name %q, got %q", "TRUSTED_HEADER_PUBLIC_KEY", env.Name)
+			}
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+				t.Fatal("expected env var to have secretKeyRef")
+			}
+			if env.ValueFrom.SecretKeyRef.Name != tt.wantSecretName {
+				t.Errorf("expected secret name %q, got %q", tt.wantSecretName, env.ValueFrom.SecretKeyRef.Name)
+			}
+			if env.ValueFrom.SecretKeyRef.Key != "key" {
+				t.Errorf("expected secret key %q, got %q", "key", env.ValueFrom.SecretKeyRef.Key)
+			}
+		})
 	}
 }
 

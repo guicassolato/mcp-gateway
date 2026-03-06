@@ -403,7 +403,7 @@ EOF
 
 ### MCPGatewayExtension
 
-Create the MCPGatewayExtension to associate the team's namespace with a specific listener on the target Gateway:
+Create the MCPGatewayExtension to associate the team's namespace with a specific listener on the target Gateway. For full details on all spec fields, see the [MCPGatewayExtension API Reference](../reference/mcpgatewayextension.md).
 
 ```bash
 kubectl apply -f - <<EOF

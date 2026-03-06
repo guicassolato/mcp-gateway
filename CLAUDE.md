@@ -83,3 +83,4 @@ ginkgo run -v --tags=e2e --focus="test description" tests/e2e/
 - No emojis or AI-style formatting
 - Files must end with newline
 - Regularly run make lint to check for lint errors.
+- When adding or changing CRD fields in `api/v1alpha1/`, update the corresponding API reference doc in `docs/reference/` to reflect the change.

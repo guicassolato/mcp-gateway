@@ -64,6 +64,22 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 	}
 	command = append(command, "--mcp-gateway-public-host="+publicHost)
 	command = append(command, "--mcp-router-key="+routerKey(mcpExt))
+
+	var envVars []corev1.EnvVar
+	if mcpExt.Spec.TrustedHeadersKey != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: "TRUSTED_HEADER_PUBLIC_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: mcpExt.Spec.TrustedHeadersKey.SecretName,
+					},
+					Key: "key",
+				},
+			},
+		})
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      brokerRouterName,
@@ -88,6 +104,7 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 							Image:           r.BrokerRouterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         command,
+							Env:             envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
@@ -387,6 +404,9 @@ func deploymentNeedsUpdate(desired, existing *appsv1.Deployment) (bool, string) 
 	}
 	if !equality.Semantic.DeepEqual(desired.Spec.Template.Spec.Volumes, existing.Spec.Template.Spec.Volumes) {
 		return true, fmt.Sprintf("volumes changed: %+v -> %+v", existing.Spec.Template.Spec.Volumes, desired.Spec.Template.Spec.Volumes)
+	}
+	if !equality.Semantic.DeepEqual(desiredContainer.Env, existingContainer.Env) {
+		return true, fmt.Sprintf("env changed: %+v -> %+v", existingContainer.Env, desiredContainer.Env)
 	}
 	return false, ""
 }
