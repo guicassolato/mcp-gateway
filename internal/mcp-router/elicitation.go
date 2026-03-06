@@ -74,7 +74,7 @@ func (w *sseRewriter) maybeRewriteElicitation(ctx context.Context, line []byte) 
 		return line
 	}
 
-	gatewayID := w.idMap.Store(msg.ID, w.req.serverName, w.req.GetSessionID())
+	gatewayID := w.idMap.Store(msg.ID, w.req.serverName, w.req.backendSessionID)
 	w.logger.InfoContext(
 		ctx,
 		"rewriting elicitation request ID",

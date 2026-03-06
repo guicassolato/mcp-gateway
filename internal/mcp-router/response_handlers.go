@@ -21,6 +21,13 @@ func (s *ExtProcServer) HandleResponseHeaders(ctx context.Context, responseHeade
 		responseHeaderBuilder.WithMCPSession(gatewaySessionID)
 	}
 
+	// on initialize responses, record whether the client declared elicitation support
+	if req != nil && req.Method == "initialize" && req.clientSupportsElicitation() {
+		if sid := getSingleValueHeader(responseHeaders.Headers, sessionHeader); sid != "" {
+			s.clientElicitation.Store(sid, true)
+		}
+	}
+
 	// intercept 404 from backend MCP Server as this means the clients mcp-session-id is invalid. We remove the session. The client can re-initialize with the gateway or they could re-invoke the tool as we will then lazily acquire a new session
 	status := getSingleValueHeader(responseHeaders.Headers, ":status")
 
@@ -34,10 +41,16 @@ func (s *ExtProcServer) HandleResponseHeaders(ctx context.Context, responseHeade
 
 	responses := response.WithResponseHeaderResponse(responseHeaderBuilder.Build()).Build()
 
-	// for tool calls, switch to STREAMED response body so we can intercept elicitation/create events in the SSE stream
-	if req != nil && req.isToolCall() {
+	// for tool calls, switch response body mode to STREAMED so the ext_proc
+	// receives each SSE chunk and can rewrite elicitation request IDs.
+	if req != nil && req.isToolCall() && len(responses) > 0 {
 		responses[0].ModeOverride = &extprochttp.ProcessingMode{
-			ResponseBodyMode: extprochttp.ProcessingMode_STREAMED,
+			RequestHeaderMode:   extprochttp.ProcessingMode_SEND,
+			ResponseHeaderMode:  extprochttp.ProcessingMode_SEND,
+			RequestBodyMode:     extprochttp.ProcessingMode_BUFFERED,
+			ResponseBodyMode:    extprochttp.ProcessingMode_STREAMED,
+			RequestTrailerMode:  extprochttp.ProcessingMode_SKIP,
+			ResponseTrailerMode: extprochttp.ProcessingMode_SKIP,
 		}
 	}
 

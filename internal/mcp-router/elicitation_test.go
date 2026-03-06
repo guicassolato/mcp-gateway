@@ -92,8 +92,8 @@ func TestSSERewriter_Process(t *testing.T) {
 				idMap:  m,
 				logger: logger,
 				req: &MCPRequest{
-					serverName: "test-server",
-					sessionID:  "test-session",
+					serverName:       "test-server",
+					backendSessionID: "test-session",
 				},
 			}
 
@@ -132,8 +132,8 @@ func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 		idMap:  m,
 		logger: logger,
 		req: &MCPRequest{
-			serverName: "weather-server",
-			sessionID:  "session-abc",
+			serverName:       "weather-server",
+			backendSessionID: "session-abc",
 		},
 	}
 
@@ -166,8 +166,8 @@ func TestSSERewriter_Process_MultipleElicitations(t *testing.T) {
 		idMap:  m,
 		logger: logger,
 		req: &MCPRequest{
-			serverName: "multi-server",
-			sessionID:  "session-multi",
+			serverName:       "multi-server",
+			backendSessionID: "session-multi",
 		},
 	}
 
@@ -197,8 +197,8 @@ func TestSSERewriter_Flush(t *testing.T) {
 			idMap:  m,
 			logger: logger,
 			req: &MCPRequest{
-				serverName: "test-server",
-				sessionID:  "test-session",
+				serverName:       "test-server",
+				backendSessionID: "test-session",
 			},
 		}
 
@@ -217,8 +217,8 @@ func TestSSERewriter_Flush(t *testing.T) {
 			idMap:  m,
 			logger: logger,
 			req: &MCPRequest{
-				serverName: "test-server",
-				sessionID:  "test-session",
+				serverName:       "test-server",
+				backendSessionID: "test-session",
 			},
 		}
 
@@ -241,8 +241,8 @@ func TestSSERewriter_Flush(t *testing.T) {
 			idMap:  m,
 			logger: logger,
 			req: &MCPRequest{
-				serverName: "test-server",
-				sessionID:  "test-session",
+				serverName:       "test-server",
+				backendSessionID: "test-session",
 			},
 		}
 
@@ -298,8 +298,8 @@ func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
 				idMap:  m,
 				logger: logger,
 				req: &MCPRequest{
-					serverName: "test-server",
-					sessionID:  "test-session",
+					serverName:       "test-server",
+					backendSessionID: "test-session",
 				},
 			}
 

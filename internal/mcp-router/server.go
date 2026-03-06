@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/Kuadrant/mcp-gateway/internal/broker"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
@@ -29,16 +30,17 @@ type SessionCache interface {
 }
 
 // InitForClient defines a function for initializing an MCP server for a client
-type InitForClient func(ctx context.Context, gatewayHost, routerKey string, conf *config.MCPServer, passThroughHeaders map[string]string) (*client.Client, error)
+type InitForClient func(ctx context.Context, gatewayHost, routerKey string, conf *config.MCPServer, passThroughHeaders map[string]string, clientElicitation bool) (*client.Client, error)
 
 // ExtProcServer struct boolean for streaming & Store headers for later use in body processing
 type ExtProcServer struct {
-	RoutingConfig  *config.MCPServersConfig
-	JWTManager     *session.JWTManager
-	Logger         *slog.Logger
-	InitForClient  InitForClient
-	SessionCache   SessionCache
-	ElicitationMap idmap.Map
+	RoutingConfig     *config.MCPServersConfig
+	JWTManager        *session.JWTManager
+	Logger            *slog.Logger
+	InitForClient     InitForClient
+	SessionCache      SessionCache
+	ElicitationMap    idmap.Map
+	clientElicitation sync.Map // gateway session ID -> bool (true if client supports elicitation)
 	//TODO this should not be needed
 	Broker broker.MCPBroker
 }
@@ -199,7 +201,10 @@ func (s *ExtProcServer) Process(stream extProcV3.ExternalProcessor_ProcessServer
 					return err
 				}
 			}
-			continue
+			if rewriter != nil {
+				continue // tool call: response body is streamed
+			}
+			return nil // non-tool-call: response body is not streamed
 		case *extProcV3.ProcessingRequest_ResponseBody:
 			body := r.ResponseBody.GetBody()
 			endOfStream := r.ResponseBody.GetEndOfStream()
@@ -219,11 +224,8 @@ func (s *ExtProcServer) Process(stream extProcV3.ExternalProcessor_ProcessServer
 					ResponseBody: &extProcV3.BodyResponse{
 						Response: &extProcV3.CommonResponse{
 							BodyMutation: &extProcV3.BodyMutation{
-								Mutation: &extProcV3.BodyMutation_StreamedResponse{
-									StreamedResponse: &extProcV3.StreamedBodyResponse{
-										Body:        body,
-										EndOfStream: endOfStream,
-									},
+								Mutation: &extProcV3.BodyMutation_Body{
+									Body: body,
 								},
 							},
 						},
