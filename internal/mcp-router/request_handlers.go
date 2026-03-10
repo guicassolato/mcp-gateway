@@ -525,9 +525,9 @@ func (s *ExtProcServer) initializeMCPSeverSession(ctx context.Context, mcpReq *M
 	s.Logger.DebugContext(ctx, "initializing target as no mcp-session-id found for client", "server ", mcpReq.serverName, "with passthrough headers", passThroughHeaders)
 
 	// check if the original client declared elicitation support
-	var clientElicitation bool
-	if v, ok := s.clientElicitation.Load(mcpReq.GetSessionID()); ok {
-		clientElicitation, _ = v.(bool)
+	clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, mcpReq.GetSessionID())
+	if elErr != nil {
+		s.Logger.ErrorContext(ctx, "failed to get client elicitation flag", "error", elErr, "session", mcpReq.GetSessionID())
 	}
 
 	clientHandle, err := s.InitForClient(ctx, s.RoutingConfig.MCPGatewayInternalHostname, s.RoutingConfig.RouterAPIKey, mcpServerConfig, passThroughHeaders, clientElicitation)

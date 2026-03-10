@@ -236,3 +236,58 @@ func TestInMemoryCache_RemoveServerSession_NonExistentGatewaySession(t *testing.
 	err = cache.RemoveServerSession(ctx, "non-existent-gateway", "server1")
 	require.NoError(t, err)
 }
+
+func TestInMemoryCache_SetAndGetClientElicitation(t *testing.T) {
+	ctx := context.Background()
+	cache, err := NewCache(ctx)
+	require.NoError(t, err)
+
+	sessionID := "gateway-session-1"
+
+	// not set initially
+	val, err := cache.GetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+	require.False(t, val)
+
+	// set elicitation
+	err = cache.SetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+
+	// now returns true
+	val, err = cache.GetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+	require.True(t, val)
+}
+
+func TestInMemoryCache_DeleteSessionsCleansUpElicitation(t *testing.T) {
+	ctx := context.Background()
+	cache, err := NewCache(ctx)
+	require.NoError(t, err)
+
+	sessionID := "gateway-session-1"
+
+	// set elicitation and add a session
+	err = cache.SetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+	_, err = cache.AddSession(ctx, sessionID, "server1", "upstream-1")
+	require.NoError(t, err)
+
+	// verify both exist
+	val, err := cache.GetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+	require.True(t, val)
+	sessions, err := cache.GetSession(ctx, sessionID)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+
+	// delete sessions cleans up both
+	err = cache.DeleteSessions(ctx, sessionID)
+	require.NoError(t, err)
+
+	val, err = cache.GetClientElicitation(ctx, sessionID)
+	require.NoError(t, err)
+	require.False(t, val)
+	sessions, err = cache.GetSession(ctx, sessionID)
+	require.NoError(t, err)
+	require.Empty(t, sessions)
+}

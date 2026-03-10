@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sync"
 
 	"github.com/Kuadrant/mcp-gateway/internal/broker"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
@@ -27,6 +26,8 @@ type SessionCache interface {
 	DeleteSessions(ctx context.Context, key ...string) error
 	RemoveServerSession(ctx context.Context, key, mcpServerID string) error
 	KeyExists(ctx context.Context, key string) (bool, error)
+	SetClientElicitation(ctx context.Context, gatewaySessionID string) error
+	GetClientElicitation(ctx context.Context, gatewaySessionID string) (bool, error)
 }
 
 // InitForClient defines a function for initializing an MCP server for a client
@@ -34,13 +35,12 @@ type InitForClient func(ctx context.Context, gatewayHost, routerKey string, conf
 
 // ExtProcServer struct boolean for streaming & Store headers for later use in body processing
 type ExtProcServer struct {
-	RoutingConfig     *config.MCPServersConfig
-	JWTManager        *session.JWTManager
-	Logger            *slog.Logger
-	InitForClient     InitForClient
-	SessionCache      SessionCache
-	ElicitationMap    idmap.Map
-	clientElicitation sync.Map // gateway session ID -> bool (true if client supports elicitation)
+	RoutingConfig  *config.MCPServersConfig
+	JWTManager     *session.JWTManager
+	Logger         *slog.Logger
+	InitForClient  InitForClient
+	SessionCache   SessionCache
+	ElicitationMap idmap.Map
 	//TODO this should not be needed
 	Broker broker.MCPBroker
 }
