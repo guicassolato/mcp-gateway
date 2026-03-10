@@ -768,8 +768,8 @@ func TestHandleElicitationResponse(t *testing.T) {
 			},
 		}
 
-		elicitationMap := idmap.New()
-		gatewayID := elicitationMap.Store(float64(42), "weather-server", "backend-session-abc")
+		elicitationMap := mustNewIDMap(t)
+		gatewayID := mustStoreIDMap(t, elicitationMap, float64(42), "weather-server", "backend-session-abc")
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -828,7 +828,8 @@ func TestHandleElicitationResponse(t *testing.T) {
 		require.Equal(t, float64(42), restored.ID)
 
 		// verify the gateway ID was consumed from the idmap (Lookup is destructive)
-		_, found := elicitationMap.Lookup(gatewayID)
+		_, found, lookupErr := elicitationMap.Lookup(context.Background(), gatewayID)
+		require.NoError(t, lookupErr)
 		require.False(t, found)
 	})
 
@@ -845,7 +846,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 			JWTManager:     jwtManager,
 			Logger:         logger,
 			SessionCache:   cache,
-			ElicitationMap: idmap.New(), // empty - no stored mappings
+			ElicitationMap: mustNewIDMap(t), // empty - no stored mappings
 			Broker:         newMockBroker(nil, map[string]string{}),
 		}
 
@@ -876,8 +877,8 @@ func TestHandleElicitationResponse(t *testing.T) {
 
 		validToken := jwtManager.Generate()
 
-		elicitationMap := idmap.New()
-		gatewayID := elicitationMap.Store(float64(1), "nonexistent-server", "session-123")
+		elicitationMap := mustNewIDMap(t)
+		gatewayID := mustStoreIDMap(t, elicitationMap, float64(1), "nonexistent-server", "session-123")
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -925,8 +926,8 @@ func TestHandleElicitationResponse(t *testing.T) {
 			},
 		}
 
-		elicitationMap := idmap.New()
-		gatewayID := elicitationMap.Store("original-string-id", "test-server", "backend-session-xyz")
+		elicitationMap := mustNewIDMap(t)
+		gatewayID := mustStoreIDMap(t, elicitationMap, "original-string-id", "test-server", "backend-session-xyz")
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -982,8 +983,8 @@ func TestHandleElicitationResponse_ViaRouteMCPRequest(t *testing.T) {
 		},
 	}
 
-	elicitationMap := idmap.New()
-	gatewayID := elicitationMap.Store(float64(99), "test-server", "backend-session-456")
+	elicitationMap := mustNewIDMap(t)
+	gatewayID := mustStoreIDMap(t, elicitationMap, float64(99), "test-server", "backend-session-456")
 
 	server := &ExtProcServer{
 		RoutingConfig: &config.MCPServersConfig{
@@ -1018,6 +1019,20 @@ func TestHandleElicitationResponse_ViaRouteMCPRequest(t *testing.T) {
 	err = json.Unmarshal(body, &restored)
 	require.NoError(t, err)
 	require.Equal(t, float64(99), restored.ID)
+}
+
+func mustNewIDMap(t *testing.T) idmap.Map {
+	t.Helper()
+	m, err := idmap.New(context.Background())
+	require.NoError(t, err)
+	return m
+}
+
+func mustStoreIDMap(t *testing.T, m idmap.Map, backendID any, serverName, sessionID string) string {
+	t.Helper()
+	id, err := m.Store(context.Background(), backendID, serverName, sessionID)
+	require.NoError(t, err)
+	return id
 }
 
 func TestHandleRequestHeaders(t *testing.T) {

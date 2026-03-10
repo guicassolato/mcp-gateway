@@ -189,9 +189,17 @@ func main() {
 	}
 	jwtSessionMgr = jwtmgr
 
+	elicitationMap, err := idmap.New(ctx)
+	if cacheConnectionStringFlag != "" {
+		elicitationMap, err = idmap.New(ctx, idmap.WithConnectionString(cacheConnectionStringFlag))
+	}
+	if err != nil {
+		panic("failed to setup elicitation map: " + err.Error())
+	}
+
 	managerTickerInterval := time.Duration(managerTickerIntervalSecs) * time.Second
 	brokerServer, mcpBroker, mcpServer := setUpBroker(mcpBrokerAddrFlag, enforceToolFilteringFlag, jwtSessionMgr, brokerWriteTimeoutSecs, managerTickerInterval)
-	routerGRPCServer, router := setUpRouter(mcpBroker, logger, jwtSessionMgr, sessionCache)
+	routerGRPCServer, router := setUpRouter(mcpBroker, logger, jwtSessionMgr, sessionCache, elicitationMap)
 	mcpConfig.RegisterObserver(router)
 	mcpConfig.RegisterObserver(mcpBroker)
 	if mcpRoutePublicHost == "" {
@@ -321,17 +329,16 @@ func setUpBroker(address string, toolFiltering bool, sessionManager *session.JWT
 	return httpSrv, mcpBroker, streamableHTTPServer
 }
 
-func setUpRouter(broker broker.MCPBroker, logger *slog.Logger, jwtManager *session.JWTManager, sessionCache *session.Cache) (*grpc.Server, *mcpRouter.ExtProcServer) {
+func setUpRouter(broker broker.MCPBroker, logger *slog.Logger, jwtManager *session.JWTManager, sessionCache *session.Cache, elicitationMap idmap.Map) (*grpc.Server, *mcpRouter.ExtProcServer) {
 
 	grpcSrv := grpc.NewServer()
-	// Create the ExtProcServer instance
 	server := &mcpRouter.ExtProcServer{
 		RoutingConfig:  mcpConfig,
 		Logger:         logger.With("component", "router"),
 		JWTManager:     jwtManager,
 		InitForClient:  clients.Initialize,
 		SessionCache:   sessionCache,
-		ElicitationMap: idmap.New(),
+		ElicitationMap: elicitationMap,
 		Broker:         broker, // TODO we shouldn't need a handle to broker in the router
 	}
 

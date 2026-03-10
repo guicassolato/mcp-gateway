@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -8,6 +9,8 @@ import (
 )
 
 func TestStoreLookup(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name    string
 		entries []struct {
@@ -85,10 +88,12 @@ func TestStoreLookup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := New()
+			m, err := New(ctx)
+			require.NoError(t, err)
 
 			if len(tt.entries) == 0 {
-				entry, ok := m.Lookup("nonexistent")
+				entry, ok, err := m.Lookup(ctx, "nonexistent")
+				require.NoError(t, err)
 				require.False(t, ok)
 				require.Equal(t, Entry{}, entry)
 				return
@@ -96,7 +101,8 @@ func TestStoreLookup(t *testing.T) {
 
 			ids := make([]string, len(tt.entries))
 			for i, e := range tt.entries {
-				ids[i] = m.Store(e.backendID, e.serverName, e.sessionID)
+				ids[i], err = m.Store(ctx, e.backendID, e.serverName, e.sessionID)
+				require.NoError(t, err)
 				require.NotEmpty(t, ids[i])
 			}
 
@@ -108,7 +114,8 @@ func TestStoreLookup(t *testing.T) {
 			}
 
 			for i, id := range ids {
-				entry, ok := m.Lookup(id)
+				entry, ok, err := m.Lookup(ctx, id)
+				require.NoError(t, err)
 				require.Equal(t, tt.expectFound, ok)
 
 				if tt.expectFound {
@@ -121,7 +128,8 @@ func TestStoreLookup(t *testing.T) {
 
 			if tt.expectDeleted {
 				for _, id := range ids {
-					_, ok := m.Lookup(id)
+					_, ok, err := m.Lookup(ctx, id)
+					require.NoError(t, err)
 					require.False(t, ok)
 				}
 			}
@@ -130,6 +138,8 @@ func TestStoreLookup(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name    string
 		storeID bool
@@ -146,23 +156,28 @@ func TestRemove(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := New()
+			m, err := New(ctx)
+			require.NoError(t, err)
 
 			id := "nonexistent"
 			if tt.storeID {
-				id = m.Store("req-1", "server1", "session-1")
+				id, err = m.Store(ctx, "req-1", "server1", "session-1")
+				require.NoError(t, err)
 			}
 
-			m.Remove(id)
+			m.Remove(ctx, id)
 
-			_, ok := m.Lookup(id)
+			_, ok, err := m.Lookup(ctx, id)
+			require.NoError(t, err)
 			require.False(t, ok)
 		})
 	}
 }
 
 func TestConcurrentAccess(t *testing.T) {
-	m := New()
+	ctx := context.Background()
+	m, err := New(ctx)
+	require.NoError(t, err)
 	var wg sync.WaitGroup
 
 	ids := make([]string, 100)
@@ -170,7 +185,9 @@ func TestConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			ids[i] = m.Store(int64(i), "server", "session")
+			id, err := m.Store(ctx, int64(i), "server", "session")
+			require.NoError(t, err)
+			ids[i] = id
 		}(i)
 	}
 	wg.Wait()
@@ -183,12 +200,15 @@ func TestConcurrentAccess(t *testing.T) {
 		if i%2 == 0 {
 			go func(i int, id string) {
 				defer wg.Done()
-				results[i], found[i] = m.Lookup(id)
+				entry, ok, err := m.Lookup(ctx, id)
+				require.NoError(t, err)
+				results[i] = entry
+				found[i] = ok
 			}(i, id)
 		} else {
 			go func(id string) {
 				defer wg.Done()
-				m.Remove(id)
+				m.Remove(ctx, id)
 			}(id)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 
 func TestSSERewriter_Process(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	ctx := context.Background()
 
 	testCases := []struct {
 		name           string
@@ -94,7 +95,8 @@ func TestSSERewriter_Process(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := idmap.New()
+			m, err := idmap.New(ctx)
+			require.NoError(t, err)
 			w := &sseRewriter{
 				idMap:  m,
 				logger: logger,
@@ -106,7 +108,7 @@ func TestSSERewriter_Process(t *testing.T) {
 
 			var outputs []string
 			for _, chunk := range tc.chunks {
-				out := w.Process(context.Background(), []byte(chunk))
+				out := w.Process(ctx, []byte(chunk))
 				outputs = append(outputs, string(out))
 			}
 
@@ -133,8 +135,10 @@ func TestSSERewriter_Process(t *testing.T) {
 }
 
 func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
+	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := idmap.New()
+	m, err := idmap.New(ctx)
+	require.NoError(t, err)
 	w := &sseRewriter{
 		idMap:  m,
 		logger: logger,
@@ -145,7 +149,7 @@ func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 	}
 
 	input := `data: {"jsonrpc":"2.0","method":"elicitation/create","id":99,"params":{"message":"confirm?"}}` + "\n"
-	out := w.Process(context.Background(), []byte(input))
+	out := w.Process(ctx, []byte(input))
 
 	require.Len(t, w.gatewayIDs, 1)
 	gatewayID := w.gatewayIDs[0]
@@ -153,13 +157,14 @@ func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 	// parse the rewritten output
 	trimmed := out[len("data: ") : len(out)-1] // strip "data: " prefix and trailing \n
 	var msg jsonRPCMessage
-	err := json.Unmarshal(trimmed, &msg)
+	err = json.Unmarshal(trimmed, &msg)
 	require.NoError(t, err)
 	require.Equal(t, "elicitation/create", msg.Method)
 	require.Equal(t, gatewayID, msg.ID)
 
 	// verify the original backend ID is retrievable from the idmap
-	entry, ok := m.Lookup(gatewayID)
+	entry, ok, err := m.Lookup(ctx, gatewayID)
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, float64(99), entry.BackendID) // json.Unmarshal decodes numbers as float64
 	require.Equal(t, "weather-server", entry.ServerName)
@@ -167,8 +172,10 @@ func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 }
 
 func TestSSERewriter_Process_MultipleElicitations(t *testing.T) {
+	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := idmap.New()
+	m, err := idmap.New(ctx)
+	require.NoError(t, err)
 	w := &sseRewriter{
 		idMap:  m,
 		logger: logger,
@@ -181,25 +188,28 @@ func TestSSERewriter_Process_MultipleElicitations(t *testing.T) {
 	line1 := `data: {"jsonrpc":"2.0","method":"elicitation/create","id":"req-1","params":{}}` + "\n"
 	line2 := `data: {"jsonrpc":"2.0","method":"elicitation/create","id":"req-2","params":{}}` + "\n"
 
-	w.Process(context.Background(), []byte(line1))
-	w.Process(context.Background(), []byte(line2))
+	w.Process(ctx, []byte(line1))
+	w.Process(ctx, []byte(line2))
 
 	require.Len(t, w.gatewayIDs, 2)
 	require.NotEqual(t, w.gatewayIDs[0], w.gatewayIDs[1])
 
 	// both should be retrievable
 	for _, gid := range w.gatewayIDs {
-		entry, ok := m.Lookup(gid)
+		entry, ok, err := m.Lookup(ctx, gid)
+		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "multi-server", entry.ServerName)
 	}
 }
 
 func TestSSERewriter_Flush(t *testing.T) {
+	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("returns remaining buffer", func(t *testing.T) {
-		m := idmap.New()
+		m, err := idmap.New(ctx)
+		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
 			logger: logger,
@@ -210,16 +220,17 @@ func TestSSERewriter_Flush(t *testing.T) {
 		}
 
 		// send a partial line (no newline)
-		out := w.Process(context.Background(), []byte("data: partial"))
+		out := w.Process(ctx, []byte("data: partial"))
 		require.Empty(t, out)
 
-		flushed := w.Flush()
+		flushed := w.Flush(ctx)
 		require.Equal(t, "data: partial", string(flushed))
 		require.Nil(t, w.buf)
 	})
 
 	t.Run("cleans up gateway IDs from idmap", func(t *testing.T) {
-		m := idmap.New()
+		m, err := idmap.New(ctx)
+		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
 			logger: logger,
@@ -230,20 +241,22 @@ func TestSSERewriter_Flush(t *testing.T) {
 		}
 
 		input := `data: {"jsonrpc":"2.0","method":"elicitation/create","id":1,"params":{}}` + "\n"
-		w.Process(context.Background(), []byte(input))
+		w.Process(ctx, []byte(input))
 		require.Len(t, w.gatewayIDs, 1)
 
 		gatewayID := w.gatewayIDs[0]
 
-		w.Flush()
+		w.Flush(ctx)
 
 		// the gateway ID should have been removed from the idmap
-		_, ok := m.Lookup(gatewayID)
+		_, ok, err := m.Lookup(ctx, gatewayID)
+		require.NoError(t, err)
 		require.False(t, ok)
 	})
 
 	t.Run("empty buffer returns nil", func(t *testing.T) {
-		m := idmap.New()
+		m, err := idmap.New(ctx)
+		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
 			logger: logger,
@@ -253,12 +266,13 @@ func TestSSERewriter_Flush(t *testing.T) {
 			},
 		}
 
-		flushed := w.Flush()
+		flushed := w.Flush(ctx)
 		require.Nil(t, flushed)
 	})
 }
 
 func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
+	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	testCases := []struct {
@@ -300,7 +314,8 @@ func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := idmap.New()
+			m, err := idmap.New(ctx)
+			require.NoError(t, err)
 			w := &sseRewriter{
 				idMap:  m,
 				logger: logger,
@@ -310,7 +325,7 @@ func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
 				},
 			}
 
-			result := w.maybeRewriteElicitation(context.Background(), []byte(tc.line))
+			result := w.maybeRewriteElicitation(ctx, []byte(tc.line))
 
 			if !tc.expectRewrite {
 				require.Equal(t, tc.line, string(result))
@@ -327,7 +342,7 @@ func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
 			// parse the rewritten JSON
 			jsonData := result[len("data: ") : len(result)-1]
 			var msg jsonRPCMessage
-			err := json.Unmarshal(jsonData, &msg)
+			err = json.Unmarshal(jsonData, &msg)
 			require.NoError(t, err)
 			require.Equal(t, "elicitation/create", msg.Method)
 			require.Equal(t, w.gatewayIDs[0], msg.ID)

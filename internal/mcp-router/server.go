@@ -213,7 +213,7 @@ func (s *ExtProcServer) Process(stream extProcV3.ExternalProcessor_ProcessServer
 				body = rewriter.Process(ctx, body)
 
 				if endOfStream {
-					remaining := rewriter.Flush()
+					remaining := rewriter.Flush(ctx)
 					body = append(body, remaining...)
 				}
 

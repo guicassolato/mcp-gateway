@@ -43,11 +43,11 @@ func (w *sseRewriter) Process(ctx context.Context, chunk []byte) []byte {
 	return output
 }
 
-func (w *sseRewriter) Flush() []byte {
+func (w *sseRewriter) Flush(ctx context.Context) []byte {
 	remaining := w.buf
 	w.buf = nil
 	for _, id := range w.gatewayIDs {
-		w.idMap.Remove(id) // tool request + response finished, no need to hold onto the mappings any more
+		w.idMap.Remove(ctx, id) // tool request + response finished, no need to hold onto the mappings any more
 	}
 	return remaining
 }
@@ -77,7 +77,11 @@ func (w *sseRewriter) maybeRewriteElicitation(ctx context.Context, line []byte) 
 		return line
 	}
 
-	gatewayID := w.idMap.Store(msg.ID, w.req.serverName, w.req.backendSessionID)
+	gatewayID, err := w.idMap.Store(ctx, msg.ID, w.req.serverName, w.req.backendSessionID)
+	if err != nil {
+		w.logger.ErrorContext(ctx, "failed to store elicitation mapping", "error", err)
+		return line
+	}
 	w.logger.InfoContext(
 		ctx,
 		"rewriting elicitation request ID",

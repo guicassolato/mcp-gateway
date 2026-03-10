@@ -437,7 +437,12 @@ func (s *ExtProcServer) HandleElicitationResponse(
 
 	gatewayID := fmt.Sprint(mcpReq.ID)
 
-	entry, ok := s.ElicitationMap.Lookup(gatewayID)
+	entry, ok, err := s.ElicitationMap.Lookup(ctx, gatewayID)
+	if err != nil {
+		s.Logger.ErrorContext(ctx, "failed to lookup elicitation mapping", "error", err, "gatewayID", gatewayID)
+		response.WithImmediateResponse(500, "internal error")
+		return response.Build()
+	}
 	if !ok {
 		s.Logger.ErrorContext(ctx, "elicitation response for unknown gateway ID", "gatewayID", gatewayID)
 		response.WithImmediateResponse(400, "unknown elicitation ID")
