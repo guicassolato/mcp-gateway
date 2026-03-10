@@ -11,6 +11,15 @@ import (
 
 var dataPrefix = []byte("data:")
 
+// sseRewriter rewrites sse elicitation requests based on contents of idMap
+// idMap entries are managed in the following way:
+//  1. Client calls tool
+//  2. Backend starts streaming response
+//  3. backend sends elicitation/create in the stream - stream stays open - id stored
+//  4. Client sends elicitation response (separate HTTP request) -> Lookup() consumes the entry
+//  5. Backend recieves the response, continues processing, sends the tool result
+//  6. Stream ends -> Flush() called -> Remove() is called on entries to clean up any orphaned elicitations,
+//     is noop for already removed keys
 type sseRewriter struct {
 	buf        []byte
 	idMap      idmap.Map
@@ -19,6 +28,9 @@ type sseRewriter struct {
 	gatewayIDs []string
 }
 
+// Process receives a chunk of SSE response data and rewrites any elicitation/create request IDs.
+// As SSE is a line-based protocol, splitting on \n ensures we only
+// parse and rewrite fully received JSON-RPC messages
 func (w *sseRewriter) Process(ctx context.Context, chunk []byte) []byte {
 	w.buf = append(w.buf, chunk...)
 
@@ -43,6 +55,8 @@ func (w *sseRewriter) Process(ctx context.Context, chunk []byte) []byte {
 	return output
 }
 
+// Flush flushes the buffer and cleans up any gatewayIDs created by the rewriter
+// This allows us to deal with orphaned elicitation id mappings
 func (w *sseRewriter) Flush(ctx context.Context) []byte {
 	remaining := w.buf
 	w.buf = nil
