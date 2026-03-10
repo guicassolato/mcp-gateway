@@ -47,16 +47,24 @@ func (s *ExtProcServer) HandleResponseHeaders(ctx context.Context, responseHeade
 
 	responses := response.WithResponseHeaderResponse(responseHeaderBuilder.Build()).Build()
 
-	// for tool calls, switch response body mode to STREAMED so the ext_proc
-	// receives each SSE chunk and can rewrite elicitation request IDs.
+	// for tool calls where the client supports elicitation, switch response body
+	// mode to STREAMED so the ext_proc receives each SSE chunk and can rewrite
+	// elicitation request IDs.
 	if req != nil && req.isToolCall() && len(responses) > 0 {
-		responses[0].ModeOverride = &extprochttp.ProcessingMode{
-			RequestHeaderMode:   extprochttp.ProcessingMode_SEND,
-			ResponseHeaderMode:  extprochttp.ProcessingMode_SEND,
-			RequestBodyMode:     extprochttp.ProcessingMode_BUFFERED,
-			ResponseBodyMode:    extprochttp.ProcessingMode_STREAMED,
-			RequestTrailerMode:  extprochttp.ProcessingMode_SKIP,
-			ResponseTrailerMode: extprochttp.ProcessingMode_SKIP,
+		gatewaySessionID := getSingleValueHeader(requestHeaders.Headers, sessionHeader)
+		clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, gatewaySessionID)
+		if elErr != nil {
+			s.Logger.ErrorContext(ctx, "failed to check client elicitation for mode override", "error", elErr)
+		}
+		if clientElicitation {
+			responses[0].ModeOverride = &extprochttp.ProcessingMode{
+				RequestHeaderMode:   extprochttp.ProcessingMode_SEND,
+				ResponseHeaderMode:  extprochttp.ProcessingMode_SEND,
+				RequestBodyMode:     extprochttp.ProcessingMode_BUFFERED,
+				ResponseBodyMode:    extprochttp.ProcessingMode_STREAMED,
+				RequestTrailerMode:  extprochttp.ProcessingMode_SKIP,
+				ResponseTrailerMode: extprochttp.ProcessingMode_SKIP,
+			}
 		}
 	}
 

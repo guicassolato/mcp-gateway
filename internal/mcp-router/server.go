@@ -184,11 +184,17 @@ func (s *ExtProcServer) Process(stream extProcV3.ExternalProcessor_ProcessServer
 			span.SetAttributes(attribute.String("http.status_code", statusCode))
 
 			if mcpRequest != nil && mcpRequest.isToolCall() {
-				rewriter = &sseRewriter{
-					idMap:      s.ElicitationMap,
-					req:        mcpRequest,
-					logger:     s.Logger,
-					gatewayIDs: make([]string, 0),
+				clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, mcpRequest.GetSessionID())
+				if elErr != nil {
+					s.Logger.ErrorContext(ctx, "failed to check client elicitation", "error", elErr)
+				}
+				if clientElicitation {
+					rewriter = &sseRewriter{
+						idMap:      s.ElicitationMap,
+						req:        mcpRequest,
+						logger:     s.Logger,
+						gatewayIDs: make([]string, 0),
+					}
 				}
 			}
 
