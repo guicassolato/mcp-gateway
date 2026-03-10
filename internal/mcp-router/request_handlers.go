@@ -225,6 +225,18 @@ func (s *ExtProcServer) RouteMCPRequest(ctx context.Context, mcpReq *MCPRequest)
 	}
 }
 
+// validateSession checks for a valid session ID and JWT
+func (s *ExtProcServer) validateSession(sessionID string) *RouterError {
+	if sessionID == "" {
+		return NewRouterError(400, fmt.Errorf("no session ID found"))
+	}
+	isInvalid, err := s.JWTManager.Validate(sessionID)
+	if err != nil || isInvalid {
+		return NewRouterError(404, fmt.Errorf("session no longer valid"))
+	}
+	return nil
+}
+
 // HandleToolCall will handle an MCP Tool Call
 func (s *ExtProcServer) HandleToolCall(ctx context.Context, mcpReq *MCPRequest) []*eppb.ProcessingResponse {
 	toolName := mcpReq.ToolName()
@@ -246,34 +258,19 @@ func (s *ExtProcServer) HandleToolCall(ctx context.Context, mcpReq *MCPRequest) 
 		calculatedResponse.WithImmediateResponse(400, "no tool name set")
 		return calculatedResponse.Build()
 	}
-	if mcpReq.GetSessionID() == "" {
-		s.Logger.InfoContext(ctx, "No mcp-session-id found in headers")
-		span.SetStatus(codes.Error, "no session ID found")
-		span.SetAttributes(attribute.String("error.type", "missing_session"))
-		calculatedResponse.WithImmediateResponse(400, "no session ID found")
-		return calculatedResponse.Build()
-	}
-	// This request wont go through the broker so needs to be validated
-	isInvalidSession, err := s.JWTManager.Validate(mcpReq.GetSessionID())
-	if err != nil {
-		s.Logger.ErrorContext(ctx, "failed to validate session", "session", mcpReq.GetSessionID(), "error ", err)
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "session validation failed")
-		span.SetAttributes(attribute.String("error.type", "session_validation_error"))
-		calculatedResponse.WithImmediateResponse(404, "session no longer valid")
-		return calculatedResponse.Build()
-	}
-	if isInvalidSession {
-		s.Logger.DebugContext(ctx, "invalid session ", "session", mcpReq.GetSessionID())
-		span.SetStatus(codes.Error, "invalid session")
+	if sessionErr := s.validateSession(mcpReq.GetSessionID()); sessionErr != nil {
+		s.Logger.ErrorContext(ctx, "session validation failed", "session", mcpReq.GetSessionID(), "error", sessionErr)
+		span.RecordError(sessionErr)
+		span.SetStatus(codes.Error, sessionErr.Error())
 		span.SetAttributes(attribute.String("error.type", "invalid_session"))
-		calculatedResponse.WithImmediateResponse(404, "session no longer valid")
+		calculatedResponse.WithImmediateResponse(sessionErr.Code(), sessionErr.Error())
 		return calculatedResponse.Build()
 	}
 
 	// Get tool annotations from broker and set headers
 	headers := NewHeaders()
 	var serverInfo *config.MCPServer
+	var err error
 	{
 		_, infoSpan := tracer().Start(ctx, "mcp-router.broker.get-server-info",
 			trace.WithAttributes(
@@ -433,14 +430,8 @@ func (s *ExtProcServer) HandleElicitationResponse(
 ) []*eppb.ProcessingResponse {
 	response := NewResponse()
 
-	if mcpReq.GetSessionID() == "" {
-		response.WithImmediateResponse(400, "no session ID found")
-		return response.Build()
-	}
-
-	isInvalid, err := s.JWTManager.Validate(mcpReq.GetSessionID())
-	if err != nil || isInvalid {
-		response.WithImmediateResponse(404, "session no longer valid")
+	if sessionErr := s.validateSession(mcpReq.GetSessionID()); sessionErr != nil {
+		response.WithImmediateResponse(sessionErr.Code(), sessionErr.Error())
 		return response.Build()
 	}
 

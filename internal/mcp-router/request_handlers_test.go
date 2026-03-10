@@ -458,6 +458,38 @@ func TestMCPRequest_GetSessionID(t *testing.T) {
 	}
 }
 
+func TestValidateSession(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	cache, err := session.NewCache(context.Background())
+	require.NoError(t, err)
+
+	jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
+	require.NoError(t, err)
+
+	validToken := jwtManager.Generate()
+
+	server := &ExtProcServer{
+		JWTManager: jwtManager,
+		Logger:     logger,
+	}
+
+	t.Run("valid session", func(t *testing.T) {
+		require.Nil(t, server.validateSession(validToken))
+	})
+
+	t.Run("empty session ID", func(t *testing.T) {
+		routerErr := server.validateSession("")
+		require.NotNil(t, routerErr)
+		require.Equal(t, int32(400), routerErr.Code())
+	})
+
+	t.Run("invalid JWT", func(t *testing.T) {
+		routerErr := server.validateSession("invalid-jwt-token")
+		require.NotNil(t, routerErr)
+		require.Equal(t, int32(404), routerErr.Code())
+	})
+}
+
 func TestMCPRequest_ReWriteToolName(t *testing.T) {
 	req := &MCPRequest{
 		Params: map[string]any{
@@ -798,70 +830,6 @@ func TestHandleElicitationResponse(t *testing.T) {
 		// verify the gateway ID was consumed from the idmap (Lookup is destructive)
 		_, found := elicitationMap.Lookup(gatewayID)
 		require.False(t, found)
-	})
-
-	t.Run("rejects missing session ID", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
-		require.NoError(t, err)
-
-		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
-		require.NoError(t, err)
-
-		server := &ExtProcServer{
-			JWTManager:     jwtManager,
-			Logger:         logger,
-			SessionCache:   cache,
-			ElicitationMap: idmap.New(),
-			Broker:         newMockBroker(nil, map[string]string{}),
-		}
-
-		data := &MCPRequest{
-			ID:      "gw-123",
-			JSONRPC: "2.0",
-			Result:  map[string]any{"action": "accept"},
-			Headers: &corev3.HeaderMap{
-				Headers: []*corev3.HeaderValue{},
-			},
-		}
-
-		resp := server.HandleElicitationResponse(context.Background(), data)
-		require.Len(t, resp, 1)
-		require.IsType(t, &eppb.ProcessingResponse_ImmediateResponse{}, resp[0].Response)
-		ir := resp[0].Response.(*eppb.ProcessingResponse_ImmediateResponse)
-		require.Equal(t, int32(400), int32(ir.ImmediateResponse.Status.Code))
-	})
-
-	t.Run("rejects invalid session", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
-		require.NoError(t, err)
-
-		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
-		require.NoError(t, err)
-
-		server := &ExtProcServer{
-			JWTManager:     jwtManager,
-			Logger:         logger,
-			SessionCache:   cache,
-			ElicitationMap: idmap.New(),
-			Broker:         newMockBroker(nil, map[string]string{}),
-		}
-
-		data := &MCPRequest{
-			ID:      "gw-123",
-			JSONRPC: "2.0",
-			Result:  map[string]any{"action": "accept"},
-			Headers: &corev3.HeaderMap{
-				Headers: []*corev3.HeaderValue{
-					{Key: "mcp-session-id", RawValue: []byte("invalid-jwt-token")},
-				},
-			},
-		}
-
-		resp := server.HandleElicitationResponse(context.Background(), data)
-		require.Len(t, resp, 1)
-		require.IsType(t, &eppb.ProcessingResponse_ImmediateResponse{}, resp[0].Response)
-		ir := resp[0].Response.(*eppb.ProcessingResponse_ImmediateResponse)
-		require.Equal(t, int32(404), int32(ir.ImmediateResponse.Status.Code))
 	})
 
 	t.Run("rejects unknown gateway ID", func(t *testing.T) {
