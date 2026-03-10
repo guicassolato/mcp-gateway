@@ -9,7 +9,7 @@ import (
 	"github.com/Kuadrant/mcp-gateway/internal/idmap"
 )
 
-var dataPrefix = []byte("data: ")
+var dataPrefix = []byte("data:")
 
 type sseRewriter struct {
 	buf        []byte
@@ -64,6 +64,9 @@ type jsonRPCMessage struct {
 func (w *sseRewriter) maybeRewriteElicitation(ctx context.Context, line []byte) []byte {
 	trimmed := bytes.TrimSpace(line)
 	jsonData := bytes.TrimPrefix(trimmed, dataPrefix)
+	if len(jsonData) > 0 && jsonData[0] == ' ' {
+		jsonData = jsonData[1:]
+	}
 
 	var msg jsonRPCMessage
 	if err := json.Unmarshal(jsonData, &msg); err != nil {
@@ -96,5 +99,5 @@ func (w *sseRewriter) maybeRewriteElicitation(ctx context.Context, line []byte) 
 	}
 
 	// preserve original line prefix and ending
-	return append(append(dataPrefix, rewritten...), '\n')
+	return append(append(append(dataPrefix, ' '), rewritten...), '\n')
 }

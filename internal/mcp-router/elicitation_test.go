@@ -83,6 +83,13 @@ func TestSSERewriter_Process(t *testing.T) {
 				`data: {"jsonrpc":"2.0","method":"tools/call","id":5,"params":{}}` + "\n",
 			},
 		},
+		{
+			name: "rewrites elicitation/create ID without space after data:",
+			chunks: []string{
+				`data:{"jsonrpc":"2.0","method":"elicitation/create","id":7,"params":{"message":"confirm"}}` + "\n",
+			},
+			expectStored: 1,
+		},
 	}
 
 	for _, tc := range testCases {
