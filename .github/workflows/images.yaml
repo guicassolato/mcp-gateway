@@ -165,16 +165,19 @@ jobs:
             ORG=${{ steps.owner.outputs.name }} \
             IMAGE_TAG=${{ github.ref_name }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push bundle image
-        run: |
-          make bundle-build \
-            REGISTRY=${{ env.REGISTRY }} \
-            ORG=${{ steps.owner.outputs.name }} \
-            IMAGE_TAG=${{ github.ref_name }}
-          make bundle-push \
-            REGISTRY=${{ env.REGISTRY }} \
-            ORG=${{ steps.owner.outputs.name }} \
-            IMAGE_TAG=${{ github.ref_name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./bundle.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/mcp-controller-bundle:${{ github.ref_name }}
 
   build-catalog:
     name: Build Catalog Image
@@ -207,17 +210,23 @@ jobs:
       - name: Install tools
         run: make olm-tools
 
-      - name: Generate and build catalog image
+      - name: Generate catalog
         run: |
           make catalog \
             REGISTRY=${{ env.REGISTRY }} \
             ORG=${{ steps.owner.outputs.name }} \
             IMAGE_TAG=${{ github.ref_name }}
-          make catalog-build \
-            REGISTRY=${{ env.REGISTRY }} \
-            ORG=${{ steps.owner.outputs.name }} \
-            IMAGE_TAG=${{ github.ref_name }}
-          make catalog-push \
-            REGISTRY=${{ env.REGISTRY }} \
-            ORG=${{ steps.owner.outputs.name }} \
-            IMAGE_TAG=${{ github.ref_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push catalog image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./catalog
+          file: ./catalog/mcp-gateway-catalog.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/mcp-controller-catalog:${{ github.ref_name }}
