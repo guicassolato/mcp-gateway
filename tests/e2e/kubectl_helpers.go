@@ -3,10 +3,12 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
+
+	. "github.com/onsi/gomega"
 )
 
 // ScaleDeployment scales a deployment to the specified replicas
@@ -48,19 +50,11 @@ func GetDeploymentGeneration(namespace, name string) (string, error) {
 // has actually started (generation changes) then wait for it to complete.
 func WaitForDeploymentReplicas(namespace, name string, replicas int, prevGeneration string) error {
 	// wait for generation to change (confirming the spec mutation was picked up)
-	for i := 0; i < 30; i++ {
-		gen, err := GetDeploymentGeneration(namespace, name)
-		if err != nil {
-			return err
-		}
-		if gen != prevGeneration {
-			break
-		}
-		if i == 29 {
-			return fmt.Errorf("deployment %s generation did not change from %s after 30s", name, prevGeneration)
-		}
-		time.Sleep(time.Second)
-	}
+	Eventually(func() string {
+		gen, _ := GetDeploymentGeneration(namespace, name)
+		return gen
+	}, "30s", "1s").ShouldNot(Equal(prevGeneration),
+		fmt.Sprintf("deployment %s generation did not change from %s", name, prevGeneration))
 
 	// now rollout status will correctly block on the new rollout
 	cmd := exec.Command("kubectl", "rollout", "status", "deployment", name,
@@ -116,23 +110,19 @@ func AddDeploymentCommandFlag(namespace, deploymentName, flag string) error {
 
 // RemoveDeploymentCommandFlag removes a flag from a deployment's container command array by value.
 func RemoveDeploymentCommandFlag(namespace, deploymentName, flag string) error {
-	// get current command array to find the index
 	cmd := exec.Command("kubectl", "get", "deployment", deploymentName,
 		"-n", namespace, "-o", "jsonpath={.spec.template.spec.containers[0].command}")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to get command array: %s: %w", string(output), err)
 	}
-	// find index of the flag by scanning the JSON array
-	raw := strings.TrimSpace(string(output))
-	// strip surrounding brackets
-	raw = strings.TrimPrefix(raw, "[")
-	raw = strings.TrimSuffix(raw, "]")
-	parts := strings.Split(raw, ",")
+	var command []string
+	if err := json.Unmarshal(output, &command); err != nil {
+		return fmt.Errorf("failed to parse command array: %w: %s", err, string(output))
+	}
 	idx := -1
-	for i, p := range parts {
-		p = strings.Trim(p, `" `)
-		if p == flag {
+	for i, c := range command {
+		if c == flag {
 			idx = i
 			break
 		}

@@ -13,15 +13,25 @@ import (
 	"strings"
 )
 
-func newMCPHTTPClient() *http.Client {
-	if strings.ToLower(useInsecureClient) == "true" {
-		return &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
+// raw MCP HTTP helpers provide direct control over the Mcp-Session-Id header,
+// which the SDK clients abstract away. This is needed for tests that verify
+// session affinity across multiple requests (e.g. redis-backed session routing).
+
+var mcpHTTPClient *http.Client
+
+func getMCPHTTPClient() *http.Client {
+	if mcpHTTPClient == nil {
+		if strings.ToLower(useInsecureClient) == "true" {
+			mcpHTTPClient = &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+		} else {
+			mcpHTTPClient = &http.Client{}
 		}
 	}
-	return &http.Client{}
+	return mcpHTTPClient
 }
 
 // mcpPost sends a raw HTTP POST to the MCP gateway and returns the response.
@@ -36,7 +46,7 @@ func mcpPost(url, sessionID string, body []byte) (*http.Response, error) {
 	if sessionID != "" {
 		req.Header.Set("Mcp-Session-Id", sessionID)
 	}
-	return newMCPHTTPClient().Do(req)
+	return getMCPHTTPClient().Do(req)
 }
 
 // mcpInitialize sends an initialize request and returns the session ID from the response header
