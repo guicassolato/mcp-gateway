@@ -52,6 +52,10 @@
 
 - When an HTTPRoute uses a Hostname backendRef (`kind: Hostname, group: networking.istio.io`) with a URLRewrite filter, and an MCPServerRegistration references that HTTPRoute, the controller should correctly handle the external endpoint configuration and the MCPServerRegistration should become ready. Tool discovery is not tested as it requires actual HTTPS connectivity to external services.
 
+### [Full] Redis session cache persists backend sessions across pod restarts
+
+- When the MCP Gateway is configured with a Redis session cache, backend MCP sessions should survive pod restarts. Redis is already deployed in the mcp-system namespace as part of CI setup. With a single gateway replica, register an MCPServerRegistration and wait for tools to be available. Then enable Redis by appending the `--cache-connection-string` flag to the mcp-gateway deployment's command array (not as an env var, since the MCPGatewayExtension controller reverts env var changes) and waiting for the rollout to complete. Using a raw HTTP client (not the MCP client library), send an `initialize` request to obtain a session ID, then send `notifications/initialized`, then call the `headers` tool to establish a backend session and capture the backend `Mcp-Session-Id` from the response content. Then trigger a rollout restart of the mcp-gateway deployment and wait for the new rollout to complete. After the new pod is running, call the `headers` tool again using the same raw HTTP session ID and verify the same backend `Mcp-Session-Id` is returned, proving the session was retrieved from Redis. Cleanup should remove the `--cache-connection-string` flag from the command array and wait for rollout. Do not deploy or delete Redis in the test itself.
+
 ### [Full] Gracefully handle an MCP Server becoming unavailable
 
 - When a backend MCP Server becomes unavailable, the gateway should no longer show its tools in the tools/list response and a notification should be sent to the client within one minute. When the MCP Server becomes available again, the tools/list should be updated to include the tools again. While unavailable any tools/call should result in a 503 response

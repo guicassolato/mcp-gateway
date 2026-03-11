@@ -282,6 +282,17 @@ func VerifyHTTPRouteNoProgrammedCondition(ctx context.Context, k8sClient client.
 	return NewVerifier(ctx, k8sClient).HTTPRouteNoProgrammedCondition(name, namespace)
 }
 
+// extractBackendSessionID returns the Mcp-Session-Id value from a tool call response
+func extractBackendSessionID(res *mcp.CallToolResult) string {
+	for _, cont := range res.Content {
+		textContent, ok := cont.(mcp.TextContent)
+		if ok && strings.HasPrefix(textContent.Text, "Mcp-Session-Id") {
+			return textContent.Text
+		}
+	}
+	return ""
+}
+
 // Legacy unexported functions for backwards compatibility
 func verifyMCPServerRegistrationToolsPresent(serverPrefix string, toolsList *mcp.ListToolsResult) bool {
 	return ToolsListHasPrefix(toolsList, serverPrefix)

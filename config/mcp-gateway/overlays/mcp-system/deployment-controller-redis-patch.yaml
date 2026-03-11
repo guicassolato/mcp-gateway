@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mcp-broker-router
+  name: mcp-gateway
 spec:
   template:
     spec:
       containers:
-        - name: mcp-broker-router
+        - name: mcp-gateway
           command:
             - ./mcp_gateway
             - --mcp-gateway-config=/config/config.yaml
