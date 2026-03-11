@@ -1,6 +1,7 @@
 package idmap
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -71,8 +72,8 @@ func (m *redisMap) Lookup(ctx context.Context, gatewayID string) (Entry, bool, e
 		return Entry{}, false, fmt.Errorf("lookup elicitation entry: %w", err)
 	}
 
-	var entry Entry
-	if err := json.Unmarshal(data, &entry); err != nil {
+	entry, err := decodeEntry(data)
+	if err != nil {
 		return Entry{}, false, fmt.Errorf("unmarshal elicitation entry: %w", err)
 	}
 
@@ -82,4 +83,38 @@ func (m *redisMap) Lookup(ctx context.Context, gatewayID string) (Entry, bool, e
 func (m *redisMap) Remove(ctx context.Context, gatewayID string) {
 	// best-effort: errors are not propagated
 	m.client.Del(ctx, keyPrefix+gatewayID)
+}
+
+// decodeEntry decodes a JSON-encoded Entry using UseNumber to preserve
+// numeric precision, then normalizes BackendID back to int64 or float64.
+func decodeEntry(data []byte) (Entry, error) {
+	var entry Entry
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
+	if err := dec.Decode(&entry); err != nil {
+		return Entry{}, err
+	}
+
+	entry.BackendID = normalizeNumber(entry.BackendID)
+	return entry, nil
+}
+
+// normalizeNumber converts json.Number to int64 (for integers) or float64 (for decimals).
+func normalizeNumber(v any) any {
+	n, ok := v.(json.Number)
+	if !ok {
+		return v
+	}
+
+	if i, err := n.Int64(); err == nil {
+		return i
+	}
+
+	if f, err := n.Float64(); err == nil {
+		return f
+	}
+
+	return v
 }

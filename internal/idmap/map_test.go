@@ -2,6 +2,8 @@ package idmap
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"sync"
 	"testing"
 
@@ -177,6 +179,89 @@ func TestRemove(t *testing.T) {
 			_, ok, err := m.Lookup(ctx, id)
 			require.NoError(t, err)
 			require.False(t, ok)
+		})
+	}
+}
+
+// TestEntryJSONRoundTrip exercises the Redis serialize/deserialize path
+// (json.Marshal → decodeEntry) without requiring a live Redis instance.
+func TestEntryJSONRoundTrip(t *testing.T) {
+	tests := []struct {
+		name      string
+		backendID any
+		wantType  any
+		wantValue any
+	}{
+		{
+			name:      "string ID preserved",
+			backendID: "req-42",
+			wantType:  "",
+			wantValue: "req-42",
+		},
+		{
+			name:      "int64 preserved",
+			backendID: int64(42),
+			wantType:  int64(0),
+			wantValue: int64(42),
+		},
+		{
+			name:      "int64 zero preserved",
+			backendID: int64(0),
+			wantType:  int64(0),
+			wantValue: int64(0),
+		},
+		{
+			name:      "negative int64 preserved",
+			backendID: int64(-100),
+			wantType:  int64(0),
+			wantValue: int64(-100),
+		},
+		{
+			name:      "large int64 beyond float64 precision",
+			backendID: int64(1<<53 + 1),
+			wantType:  int64(0),
+			wantValue: int64(1<<53 + 1),
+		},
+		{
+			name:      "max int64 preserved",
+			backendID: int64(math.MaxInt64),
+			wantType:  int64(0),
+			wantValue: int64(math.MaxInt64),
+		},
+		{
+			name:      "float64 with fraction preserved",
+			backendID: float64(3.14),
+			wantType:  float64(0),
+			wantValue: float64(3.14),
+		},
+		{
+			name:      "float64 from json.Unmarshal normalizes to int64",
+			backendID: float64(99),
+			wantType:  int64(0),
+			wantValue: int64(99),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry := Entry{
+				BackendID:        tt.backendID,
+				ServerName:       "test-server",
+				SessionID:        "session-1",
+				GatewaySessionID: "gw-1",
+			}
+
+			data, err := json.Marshal(entry)
+			require.NoError(t, err)
+
+			got, err := decodeEntry(data)
+			require.NoError(t, err)
+
+			require.IsType(t, tt.wantType, got.BackendID)
+			require.Equal(t, tt.wantValue, got.BackendID)
+			require.Equal(t, "test-server", got.ServerName)
+			require.Equal(t, "session-1", got.SessionID)
+			require.Equal(t, "gw-1", got.GatewaySessionID)
 		})
 	}
 }
