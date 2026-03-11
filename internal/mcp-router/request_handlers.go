@@ -480,6 +480,10 @@ func (s *ExtProcServer) HandleElicitationResponse(
 
 	headers.WithContentLength(len(body))
 	response.WithRequestBodyHeadersAndBodyReponse(headers.Build(), body)
+
+	// remove the mapping only after the response was successfully built
+	s.ElicitationMap.Remove(ctx, gatewayID)
+
 	return response.Build()
 }
 
@@ -528,6 +532,7 @@ func (s *ExtProcServer) initializeMCPSeverSession(ctx context.Context, mcpReq *M
 	clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, mcpReq.GetSessionID())
 	if elErr != nil {
 		s.Logger.ErrorContext(ctx, "failed to get client elicitation flag", "error", elErr, "session", mcpReq.GetSessionID())
+		return "", NewRouterErrorf(500, "failed to read client elicitation flag: %w", elErr)
 	}
 
 	clientHandle, err := s.InitForClient(ctx, s.RoutingConfig.MCPGatewayInternalHostname, s.RoutingConfig.RouterAPIKey, mcpServerConfig, passThroughHeaders, clientElicitation)

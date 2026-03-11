@@ -60,7 +60,7 @@ func TestStoreLookup(t *testing.T) {
 			expectFound: false,
 		},
 		{
-			name: "lookup deletes entry",
+			name: "lookup does not delete entry",
 			entries: []struct {
 				backendID  any
 				serverName string
@@ -69,7 +69,7 @@ func TestStoreLookup(t *testing.T) {
 				{backendID: "req-1", serverName: "server1", sessionID: "session-1"},
 			},
 			expectFound:   true,
-			expectDeleted: true,
+			expectDeleted: false,
 		},
 		{
 			name: "multiple entries are independent",

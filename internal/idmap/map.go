@@ -3,14 +3,15 @@ package idmap
 
 import (
 	"context"
+	"time"
 )
 
 // Map stores and retrieves request ID mappings.
 type Map interface {
 	// Store a new id mapping, returning the downstream gateway id
 	Store(ctx context.Context, backendID any, serverName string, sessionID string) (string, error)
-	// Lookup gets an entry for a gateway id, deleting the entry in the map.
-	// This is done as once there has been an elicitation response, we don't want the request entry anymore.
+	// Lookup gets an entry for a gateway id without removing it.
+	// Callers must call Remove explicitly after successful processing.
 	Lookup(ctx context.Context, gatewayID string) (Entry, bool, error)
 	// Remove is explicit best-effort removal for a gateway id
 	Remove(ctx context.Context, gatewayID string)
@@ -25,6 +26,7 @@ type Entry struct {
 
 type mapConfig struct {
 	connectionString string
+	entryTTL         time.Duration
 }
 
 // New returns an initialized Map. When WithConnectionString is provided, the
@@ -35,7 +37,7 @@ func New(ctx context.Context, opts ...func(*mapConfig)) (Map, error) {
 		o(cfg)
 	}
 	if cfg.connectionString != "" {
-		return newRedisMap(ctx, cfg.connectionString)
+		return newRedisMap(ctx, cfg.connectionString, cfg.entryTTL)
 	}
 	return newInMemoryMap(), nil
 }
@@ -45,5 +47,13 @@ func New(ctx context.Context, opts ...func(*mapConfig)) (Map, error) {
 func WithConnectionString(url string) func(*mapConfig) {
 	return func(c *mapConfig) {
 		c.connectionString = url
+	}
+}
+
+// WithEntryTTL sets the safety-net TTL for Redis-backed entries.
+// Only applies when a Redis connection string is configured.
+func WithEntryTTL(ttl time.Duration) func(*mapConfig) {
+	return func(c *mapConfig) {
+		c.entryTTL = ttl
 	}
 }

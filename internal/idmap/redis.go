@@ -13,15 +13,16 @@ import (
 
 const (
 	keyPrefix = "elicitation:"
-	// safety-net TTL for entries that are not cleaned up via Flush (e.g. process crash)
-	entryTTL = 1 * time.Hour
+	// default safety-net TTL for entries that are not cleaned up via Flush (e.g. process crash)
+	defaultEntryTTL = 1 * time.Hour
 )
 
 type redisMap struct {
-	client *redis.Client
+	client   *redis.Client
+	entryTTL time.Duration
 }
 
-func newRedisMap(ctx context.Context, connectionString string) (*redisMap, error) {
+func newRedisMap(ctx context.Context, connectionString string, entryTTL time.Duration) (*redisMap, error) {
 	opt, err := redis.ParseURL(connectionString)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,11 @@ func newRedisMap(ctx context.Context, connectionString string) (*redisMap, error
 		return nil, err
 	}
 
-	return &redisMap{client: client}, nil
+	if entryTTL <= 0 {
+		entryTTL = defaultEntryTTL
+	}
+
+	return &redisMap{client: client, entryTTL: entryTTL}, nil
 }
 
 func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, sessionID string) (string, error) {
@@ -49,7 +54,7 @@ func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, 
 		return "", fmt.Errorf("marshal elicitation entry: %w", err)
 	}
 
-	if err := m.client.Set(ctx, keyPrefix+id, data, entryTTL).Err(); err != nil {
+	if err := m.client.Set(ctx, keyPrefix+id, data, m.entryTTL).Err(); err != nil {
 		return "", fmt.Errorf("store elicitation entry: %w", err)
 	}
 
@@ -57,7 +62,7 @@ func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, 
 }
 
 func (m *redisMap) Lookup(ctx context.Context, gatewayID string) (Entry, bool, error) {
-	data, err := m.client.GetDel(ctx, keyPrefix+gatewayID).Bytes()
+	data, err := m.client.Get(ctx, keyPrefix+gatewayID).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return Entry{}, false, nil
 	}

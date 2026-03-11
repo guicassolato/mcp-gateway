@@ -16,8 +16,9 @@ var dataPrefix = []byte("data:")
 //  1. Client calls tool
 //  2. Backend starts streaming response
 //  3. backend sends elicitation/create in the stream - stream stays open - id stored
-//  4. Client sends elicitation response (separate HTTP request) -> Lookup() consumes the entry
-//  5. Backend recieves the response, continues processing, sends the tool result
+//  4. Client sends elicitation response (separate HTTP request) -> Lookup() reads the entry,
+//     Remove() is called after the response is successfully forwarded
+//  5. Backend receives the response, continues processing, sends the tool result
 //  6. Stream ends -> Flush() called -> Remove() is called on entries to clean up any orphaned elicitations,
 //     is noop for already removed keys
 type sseRewriter struct {

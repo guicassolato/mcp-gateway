@@ -189,9 +189,10 @@ func main() {
 	}
 	jwtSessionMgr = jwtmgr
 
+	sessionTTL := time.Duration(sessionDurationInMins) * time.Minute
 	elicitationMap, err := idmap.New(ctx)
 	if cacheConnectionStringFlag != "" {
-		elicitationMap, err = idmap.New(ctx, idmap.WithConnectionString(cacheConnectionStringFlag))
+		elicitationMap, err = idmap.New(ctx, idmap.WithConnectionString(cacheConnectionStringFlag), idmap.WithEntryTTL(sessionTTL))
 	}
 	if err != nil {
 		panic("failed to setup elicitation map: " + err.Error())

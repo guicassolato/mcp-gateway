@@ -40,8 +40,6 @@ func (m *inMemoryMap) Lookup(_ context.Context, gatewayID string) (Entry, bool, 
 		return Entry{}, false, nil
 	}
 
-	delete(m.entries, gatewayID)
-
 	return entry, ok, nil
 }
 

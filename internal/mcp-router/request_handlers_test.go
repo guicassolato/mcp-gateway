@@ -827,7 +827,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, float64(42), restored.ID)
 
-		// verify the gateway ID was consumed from the idmap (Lookup is destructive)
+		// verify the gateway ID was removed from the idmap after successful forwarding
 		_, found, lookupErr := elicitationMap.Lookup(context.Background(), gatewayID)
 		require.NoError(t, lookupErr)
 		require.False(t, found)
