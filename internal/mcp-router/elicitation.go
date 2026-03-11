@@ -92,7 +92,7 @@ func (w *sseRewriter) maybeRewriteElicitation(ctx context.Context, line []byte) 
 		return line
 	}
 
-	gatewayID, err := w.idMap.Store(ctx, msg.ID, w.req.serverName, w.req.backendSessionID)
+	gatewayID, err := w.idMap.Store(ctx, msg.ID, w.req.serverName, w.req.backendSessionID, w.req.GetSessionID())
 	if err != nil {
 		w.logger.ErrorContext(ctx, "failed to store elicitation mapping", "error", err)
 		return line

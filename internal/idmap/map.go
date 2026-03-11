@@ -9,7 +9,7 @@ import (
 // Map stores and retrieves request ID mappings.
 type Map interface {
 	// Store a new id mapping, returning the downstream gateway id
-	Store(ctx context.Context, backendID any, serverName string, sessionID string) (string, error)
+	Store(ctx context.Context, backendID any, serverName string, sessionID string, gatewaySessionID string) (string, error)
 	// Lookup gets an entry for a gateway id without removing it.
 	// Callers must call Remove explicitly after successful processing.
 	Lookup(ctx context.Context, gatewayID string) (Entry, bool, error)
@@ -19,9 +19,10 @@ type Map interface {
 
 // Entry holds a backend request ID and its associated server/session info.
 type Entry struct {
-	BackendID  any    `json:"backendID"` // per mcp spec, the ID can be string, int64, or float64
-	ServerName string `json:"serverName"`
-	SessionID  string `json:"sessionID"`
+	BackendID        any    `json:"backendID"` // per mcp spec, the ID can be string, int64, or float64
+	ServerName       string `json:"serverName"`
+	SessionID        string `json:"sessionID"`
+	GatewaySessionID string `json:"gatewaySessionID"`
 }
 
 type mapConfig struct {

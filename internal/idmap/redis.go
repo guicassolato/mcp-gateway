@@ -40,13 +40,14 @@ func newRedisMap(ctx context.Context, connectionString string, entryTTL time.Dur
 	return &redisMap{client: client, entryTTL: entryTTL}, nil
 }
 
-func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, sessionID string) (string, error) {
+func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, sessionID string, gatewaySessionID string) (string, error) {
 	id := uuid.NewString()
 
 	entry := Entry{
-		BackendID:  backendID,
-		ServerName: serverName,
-		SessionID:  sessionID,
+		BackendID:        backendID,
+		ServerName:       serverName,
+		SessionID:        sessionID,
+		GatewaySessionID: gatewaySessionID,
 	}
 
 	data, err := json.Marshal(entry)

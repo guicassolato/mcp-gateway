@@ -16,16 +16,17 @@ func newInMemoryMap() *inMemoryMap {
 	return &inMemoryMap{entries: make(map[string]Entry)}
 }
 
-func (m *inMemoryMap) Store(_ context.Context, backendID any, serverName string, sessionID string) (string, error) {
+func (m *inMemoryMap) Store(_ context.Context, backendID any, serverName string, sessionID string, gatewaySessionID string) (string, error) {
 	id := uuid.NewString()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.entries[id] = Entry{
-		BackendID:  backendID,
-		ServerName: serverName,
-		SessionID:  sessionID,
+		BackendID:        backendID,
+		ServerName:       serverName,
+		SessionID:        sessionID,
+		GatewaySessionID: gatewaySessionID,
 	}
 
 	return id, nil

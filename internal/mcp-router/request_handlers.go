@@ -448,6 +448,11 @@ func (s *ExtProcServer) HandleElicitationResponse(
 		response.WithImmediateResponse(400, "unknown elicitation ID")
 		return response.Build()
 	}
+	if entry.GatewaySessionID != mcpReq.GetSessionID() {
+		s.Logger.ErrorContext(ctx, "elicitation session mismatch", "gatewayID", gatewayID, "expected", entry.GatewaySessionID, "got", mcpReq.GetSessionID())
+		response.WithImmediateResponse(403, "session mismatch")
+		return response.Build()
+	}
 
 	// restore the id for the request
 	mcpReq.ID = entry.BackendID

@@ -769,7 +769,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 		}
 
 		elicitationMap := mustNewIDMap(t)
-		gatewayID := mustStoreIDMap(t, elicitationMap, float64(42), "weather-server", "backend-session-abc")
+		gatewayID := mustStoreIDMap(t, elicitationMap, float64(42), "weather-server", "backend-session-abc", validToken)
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -878,7 +878,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 		validToken := jwtManager.Generate()
 
 		elicitationMap := mustNewIDMap(t)
-		gatewayID := mustStoreIDMap(t, elicitationMap, float64(1), "nonexistent-server", "session-123")
+		gatewayID := mustStoreIDMap(t, elicitationMap, float64(1), "nonexistent-server", "session-123", validToken)
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -927,7 +927,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 		}
 
 		elicitationMap := mustNewIDMap(t)
-		gatewayID := mustStoreIDMap(t, elicitationMap, "original-string-id", "test-server", "backend-session-xyz")
+		gatewayID := mustStoreIDMap(t, elicitationMap, "original-string-id", "test-server", "backend-session-xyz", validToken)
 
 		server := &ExtProcServer{
 			RoutingConfig: &config.MCPServersConfig{
@@ -984,7 +984,7 @@ func TestHandleElicitationResponse_ViaRouteMCPRequest(t *testing.T) {
 	}
 
 	elicitationMap := mustNewIDMap(t)
-	gatewayID := mustStoreIDMap(t, elicitationMap, float64(99), "test-server", "backend-session-456")
+	gatewayID := mustStoreIDMap(t, elicitationMap, float64(99), "test-server", "backend-session-456", validToken)
 
 	server := &ExtProcServer{
 		RoutingConfig: &config.MCPServersConfig{
@@ -1028,9 +1028,9 @@ func mustNewIDMap(t *testing.T) idmap.Map {
 	return m
 }
 
-func mustStoreIDMap(t *testing.T, m idmap.Map, backendID any, serverName, sessionID string) string {
+func mustStoreIDMap(t *testing.T, m idmap.Map, backendID any, serverName, sessionID, gatewaySessionID string) string {
 	t.Helper()
-	id, err := m.Store(context.Background(), backendID, serverName, sessionID)
+	id, err := m.Store(context.Background(), backendID, serverName, sessionID, gatewaySessionID)
 	require.NoError(t, err)
 	return id
 }
