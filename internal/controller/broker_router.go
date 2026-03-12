@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 
 	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
@@ -36,12 +37,15 @@ const (
 	brokerConfigPort = 8181
 )
 
-// flags that can be changed directly on the deployment without triggering an update
-var ignoredCommandFlags = []string{
-	"--cache-connection-string",
-	"--log-level",
-	"--log-format",
-	"--session-length",
+// managedCommandFlags are the flags the controller owns and reconciles.
+// Any flag not in this list is user-managed and preserved as-is.
+var managedCommandFlags = []string{
+	"--mcp-broker-public-address",
+	"--mcp-gateway-private-host",
+	"--mcp-gateway-config",
+	"--mcp-check-interval",
+	"--mcp-gateway-public-host",
+	"--mcp-router-key",
 }
 
 func brokerRouterLabels() map[string]string {
@@ -288,7 +292,15 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 
 	if needsUpdate, reason := deploymentNeedsUpdate(deployment, existingDeployment); needsUpdate {
 		r.log.Info("updating broker-router deployment", "namespace", mcpExt.Namespace, "reason", reason)
-		existingDeployment.Spec.Template.Spec.Containers = deployment.Spec.Template.Spec.Containers
+		desiredContainer := deployment.Spec.Template.Spec.Containers[0]
+		existingContainer := existingDeployment.Spec.Template.Spec.Containers[0]
+		// merge command: update managed flags, preserve user flags
+		existingContainer.Command = mergeCommand(desiredContainer.Command, existingContainer.Command)
+		existingContainer.Image = desiredContainer.Image
+		existingContainer.Ports = desiredContainer.Ports
+		existingContainer.Env = desiredContainer.Env
+		existingContainer.VolumeMounts = desiredContainer.VolumeMounts
+		existingDeployment.Spec.Template.Spec.Containers[0] = existingContainer
 		existingDeployment.Spec.Template.Spec.Volumes = deployment.Spec.Template.Spec.Volumes
 		if err := r.Update(ctx, existingDeployment); err != nil {
 			return false, fmt.Errorf("failed to update deployment: %w", err)
@@ -390,9 +402,9 @@ func deploymentNeedsUpdate(desired, existing *appsv1.Deployment) (bool, string) 
 	if desiredContainer.Image != existingContainer.Image {
 		return true, fmt.Sprintf("image changed: %q -> %q", existingContainer.Image, desiredContainer.Image)
 	}
-	// filter out flags that can be changed directly on the deployment
-	desiredCmd := filterIgnoredFlags(desiredContainer.Command)
-	existingCmd := filterIgnoredFlags(existingContainer.Command)
+	// only compare flags the controller manages; user-added flags are preserved
+	desiredCmd := filterManagedFlags(desiredContainer.Command)
+	existingCmd := filterManagedFlags(existingContainer.Command)
 	if !equality.Semantic.DeepEqual(desiredCmd, existingCmd) {
 		return true, fmt.Sprintf("command changed: %v -> %v", existingCmd, desiredCmd)
 	}
@@ -411,21 +423,36 @@ func deploymentNeedsUpdate(desired, existing *appsv1.Deployment) (bool, string) 
 	return false, ""
 }
 
-func filterIgnoredFlags(command []string) []string {
-	filtered := make([]string, 0, len(command))
+// filterManagedFlags returns only the binary name and flags the controller manages.
+func filterManagedFlags(command []string) []string {
+	var out []string
 	for _, arg := range command {
-		ignore := false
-		for _, flag := range ignoredCommandFlags {
-			if strings.HasPrefix(arg, flag) {
-				ignore = true
-				break
-			}
-		}
-		if !ignore {
-			filtered = append(filtered, arg)
+		if !strings.HasPrefix(arg, "--") || slices.ContainsFunc(managedCommandFlags, func(flag string) bool {
+			return strings.HasPrefix(arg, flag)
+		}) {
+			out = append(out, arg)
 		}
 	}
-	return filtered
+	return out
+}
+
+// mergeCommand takes the desired command from the controller and the existing
+// command from the deployment. It returns a merged command that preserves any
+// user-added flags while updating controller-managed flags.
+func mergeCommand(desired, existing []string) []string {
+	// start with all user flags from the existing command
+	var userFlags []string
+	for _, arg := range existing {
+		if !strings.HasPrefix(arg, "--") {
+			continue
+		}
+		if !slices.ContainsFunc(managedCommandFlags, func(flag string) bool {
+			return strings.HasPrefix(arg, flag)
+		}) {
+			userFlags = append(userFlags, arg)
+		}
+	}
+	return slices.Concat(desired, userFlags)
 }
 
 func (r *MCPGatewayExtensionReconciler) buildGatewayHTTPRoute(mcpExt *mcpv1alpha1.MCPGatewayExtension, publicHost string) *gatewayv1.HTTPRoute {
