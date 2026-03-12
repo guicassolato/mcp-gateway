@@ -28,7 +28,7 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 							{
 								Name:    "test-container",
 								Image:   "test-image:v1",
-								Command: []string{"./app", "--flag=value"},
+								Command: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--mcp-gateway-public-host=test.example.com"},
 								Ports: []corev1.ContainerPort{
 									{Name: "http", ContainerPort: 8080},
 									{Name: "grpc", ContainerPort: 50051},
@@ -72,19 +72,33 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "command changed",
+			name: "managed flag changed",
 			modify: func(d *appsv1.Deployment) {
-				d.Spec.Template.Spec.Containers[0].Command = []string{"./app", "--flag=changed"}
+				d.Spec.Template.Spec.Containers[0].Command = []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:9090", "--mcp-gateway-public-host=test.example.com"}
 			},
 			expected: true,
 		},
 		{
-			name: "command added",
+			name: "user-added flag does not trigger update",
 			modify: func(d *appsv1.Deployment) {
 				d.Spec.Template.Spec.Containers[0].Command = append(
 					d.Spec.Template.Spec.Containers[0].Command,
-					"--new-flag",
+					"--log-level=debug",
 				)
+			},
+			expected: false,
+		},
+		{
+			name: "managed flag added triggers update",
+			modify: func(d *appsv1.Deployment) {
+				// remove --mcp-gateway-public-host from existing to simulate a new managed flag
+				var cmd []string
+				for _, arg := range d.Spec.Template.Spec.Containers[0].Command {
+					if !strings.HasPrefix(arg, "--mcp-gateway-public-host=") {
+						cmd = append(cmd, arg)
+					}
+				}
+				d.Spec.Template.Spec.Containers[0].Command = cmd
 			},
 			expected: true,
 		},
@@ -135,7 +149,7 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "ignored flag cache-connection-string changed",
+			name: "user flag cache-connection-string does not trigger update",
 			modify: func(d *appsv1.Deployment) {
 				d.Spec.Template.Spec.Containers[0].Command = append(
 					d.Spec.Template.Spec.Containers[0].Command,
@@ -145,27 +159,7 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "ignored flag log-level changed",
-			modify: func(d *appsv1.Deployment) {
-				d.Spec.Template.Spec.Containers[0].Command = append(
-					d.Spec.Template.Spec.Containers[0].Command,
-					"--log-level=debug",
-				)
-			},
-			expected: false,
-		},
-		{
-			name: "ignored flag log-format changed",
-			modify: func(d *appsv1.Deployment) {
-				d.Spec.Template.Spec.Containers[0].Command = append(
-					d.Spec.Template.Spec.Containers[0].Command,
-					"--log-format=json",
-				)
-			},
-			expected: false,
-		},
-		{
-			name: "ignored flag session-length changed",
+			name: "user flag session-length does not trigger update",
 			modify: func(d *appsv1.Deployment) {
 				d.Spec.Template.Spec.Containers[0].Command = append(
 					d.Spec.Template.Spec.Containers[0].Command,
@@ -175,14 +169,14 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "non-ignored flag still triggers update",
+			name: "arbitrary user flag does not trigger update",
 			modify: func(d *appsv1.Deployment) {
 				d.Spec.Template.Spec.Containers[0].Command = append(
 					d.Spec.Template.Spec.Containers[0].Command,
-					"--some-other-flag=value",
+					"--some-custom-flag=value",
 				)
 			},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "env var added",
@@ -1221,6 +1215,103 @@ func TestBuildGatewayHTTPRoute(t *testing.T) {
 			}
 			if parentRef.SectionName == nil || string(*parentRef.SectionName) != tt.mcpExt.Spec.TargetRef.SectionName {
 				t.Errorf("parentRef sectionName = %v, want %q", parentRef.SectionName, tt.mcpExt.Spec.TargetRef.SectionName)
+			}
+		})
+	}
+}
+
+func TestFilterManagedFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		command []string
+		want    []string
+	}{
+		{
+			name:    "binary only",
+			command: []string{"./mcp_gateway"},
+			want:    []string{"./mcp_gateway"},
+		},
+		{
+			name:    "all managed flags kept",
+			command: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--mcp-gateway-public-host=example.com"},
+			want:    []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--mcp-gateway-public-host=example.com"},
+		},
+		{
+			name:    "user flags stripped",
+			command: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--log-level=debug", "--cache-connection-string=redis://localhost"},
+			want:    []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+		},
+		{
+			name:    "empty command",
+			command: []string{},
+			want:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterManagedFlags(tt.command)
+			if len(got) != len(tt.want) {
+				t.Fatalf("filterManagedFlags() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("filterManagedFlags()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestMergeCommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		desired  []string
+		existing []string
+		want     []string
+	}{
+		{
+			name:     "no user flags",
+			desired:  []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+			existing: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+			want:     []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+		},
+		{
+			name:     "preserves user flags from existing",
+			desired:  []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+			existing: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--log-level=debug"},
+			want:     []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--log-level=debug"},
+		},
+		{
+			name:     "updates managed flag and preserves user flags",
+			desired:  []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:9090"},
+			existing: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--cache-connection-string=redis://localhost"},
+			want:     []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:9090", "--cache-connection-string=redis://localhost"},
+		},
+		{
+			name:     "multiple user flags preserved",
+			desired:  []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+			existing: []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--log-level=debug", "--session-length=3600"},
+			want:     []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080", "--log-level=debug", "--session-length=3600"},
+		},
+		{
+			name:     "existing has no flags",
+			desired:  []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+			existing: []string{"./mcp_gateway"},
+			want:     []string{"./mcp_gateway", "--mcp-broker-public-address=0.0.0.0:8080"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeCommand(tt.desired, tt.existing)
+			if len(got) != len(tt.want) {
+				t.Fatalf("mergeCommand() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("mergeCommand()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
 			}
 		})
 	}
