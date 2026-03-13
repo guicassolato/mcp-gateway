@@ -9,16 +9,23 @@ By default, the MCP Gateway runs as a single replica with session mappings store
 Key concepts:
 - **Session Mapping**: Each gateway session ID maps to one or more backend MCP server session IDs
 - **Lazy Initialization**: Backend sessions are created on first `tools/call`, not at connection time
-- **Shared State**: An external store (Redis) makes session mappings accessible to all gateway replicas
+- **Shared State**: An external Redis-based datastore makes session mappings accessible to all gateway replicas
 
 ## Prerequisites
 
 - MCP Gateway installed and configured
-- A Redis instance accessible from the gateway (Redis 7+ recommended)
+- A Redis-based datastore accessible from the gateway
 
-## Step 1: Deploy Redis
+The gateway connects using the Redis protocol and is compatible with any Redis-based datastore. For details on how to install and configure a datastore, see the documentation for your chosen implementation:
 
-If you don't already have a Redis instance available, deploy one in your cluster. Any standard Redis deployment will work. For example:
+- [Redis documentation](https://redis.io/docs/latest/)
+- [AWS ElastiCache (Redis OSS) User Guide](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/WhatIs.html)
+- [Dragonfly documentation](https://www.dragonflydb.io/docs)
+- [Valkey documentation](https://valkey.io/docs/)
+
+## Step 1: Deploy a Redis-based Datastore
+
+If you don't already have a Redis-based datastore available, deploy one in your cluster. Any Redis-compatible deployment will work. For example, to deploy Redis:
 
 ```bash
 kubectl apply -n your-namespace -f - <<EOF
@@ -65,7 +72,7 @@ spec:
 EOF
 ```
 
-Wait for Redis to be ready:
+Wait for the datastore to be ready:
 
 ```bash
 kubectl rollout status deployment/redis -n your-namespace
@@ -73,7 +80,7 @@ kubectl rollout status deployment/redis -n your-namespace
 
 ## Step 2: Configure the Gateway Connection
 
-Configure the MCP Gateway to use Redis by adding the `--cache-connection-string` flag to the gateway deployment's command:
+Configure the MCP Gateway to use the datastore by adding the `--cache-connection-string` flag to the gateway deployment's command:
 
 ```bash
 kubectl patch deployment mcp-gateway -n mcp-system --type=json \
@@ -92,13 +99,13 @@ kubectl rollout status deployment/mcp-gateway -n mcp-system
 redis://<user>:<password>@<host>:<port>/<db>
 ```
 
-For a Redis instance without authentication in the same cluster, the host is typically `redis.<namespace>.svc.cluster.local`.
+For an instance without authentication in the same cluster, the host is typically `<service-name>.<namespace>.svc.cluster.local`.
 
 > **Note:** The `--cache-connection-string` flag is in the controller's ignored flags list, so the MCPGatewayExtension controller will not revert this change during reconciliation. Do not use `kubectl set env` as the controller will revert environment variable changes.
 
 ## Step 3: Scale the Gateway
 
-With Redis configured, scale the gateway to multiple replicas:
+With the datastore configured, scale the gateway to multiple replicas:
 
 ```bash
 kubectl scale deployment/mcp-gateway -n mcp-system --replicas=2
@@ -112,7 +119,7 @@ kubectl rollout status deployment/mcp-gateway -n mcp-system
 
 ## Step 4: Verify Session Sharing
 
-Confirm that Redis is active by checking the gateway logs. You should see `session cache using external store` on startup:
+Confirm that the external store is active by checking the gateway logs. You should see `session cache using external store` on startup:
 
 ```bash
 kubectl logs -n mcp-system deployment/mcp-gateway | grep "session cache"
