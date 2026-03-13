@@ -43,8 +43,8 @@ echo "==> Step 4: Creating Secret with Authentication..."
 envsubst < "$SCRIPT_DIR/secret.yaml" | kubectl apply -f -
 
 echo ""
-echo "==> Step 5: Creating MCPServer Resource..."
-kubectl apply -f "$SCRIPT_DIR/mcpserver.yaml"
+echo "==> Step 5: Creating MCPServerRegistration Resource..."
+kubectl apply -f "$SCRIPT_DIR/mcpserverregistration.yaml"
 
 echo ""
 echo "==> Step 6: Applying AuthPolicy..."
