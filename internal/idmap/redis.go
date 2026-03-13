@@ -23,22 +23,11 @@ type redisMap struct {
 	entryTTL time.Duration
 }
 
-func newRedisMap(ctx context.Context, connectionString string, entryTTL time.Duration) (*redisMap, error) {
-	opt, err := redis.ParseURL(connectionString)
-	if err != nil {
-		return nil, err
-	}
-
-	client := redis.NewClient(opt)
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, err
-	}
-
+func newRedisMapFromClient(client *redis.Client, entryTTL time.Duration) *redisMap {
 	if entryTTL <= 0 {
 		entryTTL = defaultEntryTTL
 	}
-
-	return &redisMap{client: client, entryTTL: entryTTL}, nil
+	return &redisMap{client: client, entryTTL: entryTTL}
 }
 
 func (m *redisMap) Store(ctx context.Context, backendID any, serverName string, sessionID string, gatewaySessionID string) (string, error) {

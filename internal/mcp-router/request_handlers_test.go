@@ -161,7 +161,7 @@ func TestHandleRequestBody(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Create session cache
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	// Create JWT manager for test
@@ -460,7 +460,7 @@ func TestMCPRequest_GetSessionID(t *testing.T) {
 
 func TestValidateSession(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -750,7 +750,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("routes elicitation response to correct backend", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
+		cache, err := session.NewCache()
 		require.NoError(t, err)
 
 		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -834,7 +834,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 	})
 
 	t.Run("rejects unknown gateway ID", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
+		cache, err := session.NewCache()
 		require.NoError(t, err)
 
 		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -869,7 +869,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 	})
 
 	t.Run("rejects unknown server name", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
+		cache, err := session.NewCache()
 		require.NoError(t, err)
 
 		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -910,7 +910,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 	})
 
 	t.Run("restores string backend ID", func(t *testing.T) {
-		cache, err := session.NewCache(context.Background())
+		cache, err := session.NewCache()
 		require.NoError(t, err)
 
 		jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -967,7 +967,7 @@ func TestHandleElicitationResponse(t *testing.T) {
 func TestHandleElicitationResponse_ViaRouteMCPRequest(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	jwtManager, err := session.NewJWTManager("test-signing-key", 0, logger, cache)
@@ -1023,7 +1023,7 @@ func TestHandleElicitationResponse_ViaRouteMCPRequest(t *testing.T) {
 
 func mustNewIDMap(t *testing.T) idmap.Map {
 	t.Helper()
-	m, err := idmap.New(context.Background())
+	m, err := idmap.New()
 	require.NoError(t, err)
 	return m
 }

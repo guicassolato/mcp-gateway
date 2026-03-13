@@ -95,7 +95,7 @@ func TestSSERewriter_Process(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := idmap.New(ctx)
+			m, err := idmap.New()
 			require.NoError(t, err)
 			w := &sseRewriter{
 				idMap:  m,
@@ -137,7 +137,7 @@ func TestSSERewriter_Process(t *testing.T) {
 func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m, err := idmap.New(ctx)
+	m, err := idmap.New()
 	require.NoError(t, err)
 	w := &sseRewriter{
 		idMap:  m,
@@ -174,7 +174,7 @@ func TestSSERewriter_Process_RewrittenIDIsValid(t *testing.T) {
 func TestSSERewriter_Process_MultipleElicitations(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m, err := idmap.New(ctx)
+	m, err := idmap.New()
 	require.NoError(t, err)
 	w := &sseRewriter{
 		idMap:  m,
@@ -208,7 +208,7 @@ func TestSSERewriter_Flush(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("returns remaining buffer", func(t *testing.T) {
-		m, err := idmap.New(ctx)
+		m, err := idmap.New()
 		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
@@ -229,7 +229,7 @@ func TestSSERewriter_Flush(t *testing.T) {
 	})
 
 	t.Run("cleans up gateway IDs from idmap", func(t *testing.T) {
-		m, err := idmap.New(ctx)
+		m, err := idmap.New()
 		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
@@ -255,7 +255,7 @@ func TestSSERewriter_Flush(t *testing.T) {
 	})
 
 	t.Run("empty buffer returns nil", func(t *testing.T) {
-		m, err := idmap.New(ctx)
+		m, err := idmap.New()
 		require.NoError(t, err)
 		w := &sseRewriter{
 			idMap:  m,
@@ -314,7 +314,7 @@ func TestSSERewriter_MaybeRewriteElicitation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := idmap.New(ctx)
+			m, err := idmap.New()
 			require.NoError(t, err)
 			w := &sseRewriter{
 				idMap:  m,

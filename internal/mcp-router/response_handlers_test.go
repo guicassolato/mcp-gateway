@@ -29,7 +29,7 @@ type mockBrokerImpl struct {
 
 func TestHandleResponseHeaders_ReturnsGatewaySessionID(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -87,7 +87,7 @@ func TestHandleResponseHeaders_ReturnsGatewaySessionID(t *testing.T) {
 
 func TestHandleResponseHeaders_NoGatewaySessionID(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -130,7 +130,7 @@ func TestHandleResponseHeaders_NoGatewaySessionID(t *testing.T) {
 
 func TestHandleResponseHeaders_404RemovesServerSession(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -196,7 +196,7 @@ func TestHandleResponseHeaders_404RemovesServerSession(t *testing.T) {
 
 func TestHandleResponseHeaders_404WithoutMCPRequest(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -241,7 +241,7 @@ func TestHandleResponseHeaders_404WithoutMCPRequest(t *testing.T) {
 
 func TestHandleResponseHeaders_404WithMultipleServerSessions(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -312,7 +312,7 @@ func TestHandleResponseHeaders_404WithMultipleServerSessions(t *testing.T) {
 
 func TestHandleResponseHeaders_SuccessStatusDoesNotRemoveSession(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	server := &ExtProcServer{
@@ -378,7 +378,7 @@ func TestHandleResponseHeaders_SuccessStatusDoesNotRemoveSession(t *testing.T) {
 
 func TestHandleResponseHeaders_StoresElicitationForDirectInit(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	srv := &ExtProcServer{
@@ -424,7 +424,7 @@ func TestHandleResponseHeaders_StoresElicitationForDirectInit(t *testing.T) {
 
 func TestHandleResponseHeaders_SkipsElicitationForHairpinInit(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cache, err := session.NewCache(context.Background())
+	cache, err := session.NewCache()
 	require.NoError(t, err)
 
 	srv := &ExtProcServer{

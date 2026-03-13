@@ -4,6 +4,8 @@ package idmap
 import (
 	"context"
 	"time"
+
+	redis "github.com/redis/go-redis/v9"
 )
 
 // Map stores and retrieves request ID mappings.
@@ -26,33 +28,32 @@ type Entry struct {
 }
 
 type mapConfig struct {
-	connectionString string
-	entryTTL         time.Duration
+	redisClient *redis.Client
+	entryTTL    time.Duration
 }
 
-// New returns an initialized Map. When WithConnectionString is provided, the
-// returned Map is backed by Redis; otherwise it uses an in-memory store.
-func New(ctx context.Context, opts ...func(*mapConfig)) (Map, error) {
+// New returns an initialized Map. Pass WithRedisClient to use a Redis-backed
+// store; otherwise an in-memory store is returned.
+func New(opts ...func(*mapConfig)) (Map, error) {
 	cfg := &mapConfig{}
 	for _, o := range opts {
 		o(cfg)
 	}
-	if cfg.connectionString != "" {
-		return newRedisMap(ctx, cfg.connectionString, cfg.entryTTL)
+	if cfg.redisClient != nil {
+		return newRedisMapFromClient(cfg.redisClient, cfg.entryTTL), nil
 	}
 	return newInMemoryMap(), nil
 }
 
-// WithConnectionString configures the Map to use a Redis backend.
-// Format: redis://<user>:<pass>@localhost:6379/<db>
-func WithConnectionString(url string) func(*mapConfig) {
+// WithRedisClient configures the Map to use an existing Redis client.
+func WithRedisClient(client *redis.Client) func(*mapConfig) {
 	return func(c *mapConfig) {
-		c.connectionString = url
+		c.redisClient = client
 	}
 }
 
 // WithEntryTTL sets the safety-net TTL for Redis-backed entries.
-// Only applies when a Redis connection string is configured.
+// Only applies when a Redis client is configured.
 func WithEntryTTL(ttl time.Duration) func(*mapConfig) {
 	return func(c *mapConfig) {
 		c.entryTTL = ttl

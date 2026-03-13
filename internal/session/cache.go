@@ -12,9 +12,8 @@ const clientElicitationPrefix = "clientelicitation:"
 
 // Cache implements a cache
 type Cache struct {
-	connectionString string
-	inmemory         *sync.Map
-	extClient        *redis.Client
+	inmemory  *sync.Map
+	extClient *redis.Client
 }
 
 // KeyExists checks if a key exists in the cache
@@ -121,39 +120,25 @@ func (c *Cache) GetClientElicitation(ctx context.Context, gatewaySessionID strin
 	return val == "1", nil
 }
 
-// Close closes the cache connection
-func (c *Cache) Close() error {
-	if c.inmemory != nil {
-		return nil
-	}
-	return c.extClient.Close()
-}
-
-// NewCache returns a new cache
-func NewCache(ctx context.Context, opts ...func(*Cache)) (*Cache, error) {
-	c := &Cache{
-		inmemory: nil,
-	}
+// NewCache returns a new cache. Pass WithRedisClient to use an external redis
+// store; otherwise an in-memory cache is returned.
+func NewCache(opts ...func(*Cache)) (*Cache, error) {
+	c := &Cache{}
 	for _, opt := range opts {
 		opt(c)
 	}
-	if c.connectionString != "" {
-		opt, err := redis.ParseURL(c.connectionString)
-		if err != nil {
-			return c, err
-		}
-
-		c.extClient = redis.NewClient(opt)
-		return c, c.extClient.Ping(ctx).Err()
+	if c.extClient != nil {
+		return c, nil
 	}
 	c.inmemory = &sync.Map{}
 	return c, nil
 }
 
-// WithConnectionString accepts a redis connections string "redis://<user>:<pass>@localhost:6379/<db>"
-func WithConnectionString(url string) func(c *Cache) {
+// WithRedisClient configures the cache to use an existing redis client
+func WithRedisClient(client *redis.Client) func(c *Cache) {
 	return func(c *Cache) {
-		c.inmemory = nil
-		c.connectionString = url
+		if client != nil {
+			c.extClient = client
+		}
 	}
 }

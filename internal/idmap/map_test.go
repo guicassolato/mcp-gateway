@@ -96,7 +96,7 @@ func TestStoreLookup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := New(ctx)
+			m, err := New()
 			require.NoError(t, err)
 
 			if len(tt.entries) == 0 {
@@ -165,7 +165,7 @@ func TestRemove(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := New(ctx)
+			m, err := New()
 			require.NoError(t, err)
 
 			id := "nonexistent"
@@ -268,7 +268,7 @@ func TestEntryJSONRoundTrip(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	ctx := context.Background()
-	m, err := New(ctx)
+	m, err := New()
 	require.NoError(t, err)
 	var wg sync.WaitGroup
 
