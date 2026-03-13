@@ -72,16 +72,17 @@ const (
 
 // MCPRequest encapsulates a mcp protocol request to the gateway
 type MCPRequest struct {
-	ID               any               `json:"id"`
-	JSONRPC          string            `json:"jsonrpc"`
-	Method           string            `json:"method,omitempty"`
-	Params           map[string]any    `json:"params,omitempty"`
-	Result           map[string]any    `json:"result,omitempty"` // set in elicitation responses (which are a request from the client)
-	Headers          *corev3.HeaderMap `json:"-"`
-	Streaming        bool              `json:"-"`
-	sessionID        string            `json:"-"`
-	serverName       string            `json:"-"`
-	backendSessionID string            `json:"-"`
+	ID                any               `json:"id"`
+	JSONRPC           string            `json:"jsonrpc"`
+	Method            string            `json:"method,omitempty"`
+	Params            map[string]any    `json:"params,omitempty"`
+	Result            map[string]any    `json:"result,omitempty"` // set in elicitation responses (which are a request from the client)
+	Headers           *corev3.HeaderMap `json:"-"`
+	Streaming         bool              `json:"-"`
+	sessionID         string            `json:"-"`
+	serverName        string            `json:"-"`
+	backendSessionID  string            `json:"-"`
+	clientElicitation bool              `json:"-"`
 }
 
 // GetSingleHeaderValue returns a single header value
@@ -534,13 +535,16 @@ func (s *ExtProcServer) initializeMCPSeverSession(ctx context.Context, mcpReq *M
 	s.Logger.DebugContext(ctx, "initializing target as no mcp-session-id found for client", "server ", mcpReq.serverName, "with passthrough headers", passThroughHeaders)
 
 	// check if the original client declared elicitation support
-	clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, mcpReq.GetSessionID())
-	if elErr != nil {
-		s.Logger.ErrorContext(ctx, "failed to get client elicitation flag", "error", elErr, "session", mcpReq.GetSessionID())
-		return "", NewRouterErrorf(500, "failed to read client elicitation flag: %w", elErr)
+	if !mcpReq.clientElicitation {
+		clientElicitation, elErr := s.SessionCache.GetClientElicitation(ctx, mcpReq.GetSessionID())
+		if elErr != nil {
+			s.Logger.ErrorContext(ctx, "failed to get client elicitation flag", "error", elErr, "session", mcpReq.GetSessionID())
+			return "", NewRouterErrorf(500, "failed to read client elicitation flag: %w", elErr)
+		}
+		mcpReq.clientElicitation = clientElicitation
 	}
 
-	clientHandle, err := s.InitForClient(ctx, s.RoutingConfig.MCPGatewayInternalHostname, s.RoutingConfig.RouterAPIKey, mcpServerConfig, passThroughHeaders, clientElicitation)
+	clientHandle, err := s.InitForClient(ctx, s.RoutingConfig.MCPGatewayInternalHostname, s.RoutingConfig.RouterAPIKey, mcpServerConfig, passThroughHeaders, mcpReq.clientElicitation)
 	if err != nil {
 		s.Logger.ErrorContext(ctx, "failed to get remote session ", "error", err)
 		initSpan.RecordError(err)

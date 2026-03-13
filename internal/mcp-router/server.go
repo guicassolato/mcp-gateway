@@ -188,6 +188,7 @@ func (s *ExtProcServer) Process(stream extProcV3.ExternalProcessor_ProcessServer
 				if elErr != nil {
 					s.Logger.ErrorContext(ctx, "failed to check client elicitation", "error", elErr)
 				}
+				mcpRequest.clientElicitation = clientElicitation
 				if clientElicitation {
 					rewriter = &sseRewriter{
 						idMap:      s.ElicitationMap,
