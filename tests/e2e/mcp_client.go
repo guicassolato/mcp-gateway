@@ -92,3 +92,49 @@ func NewMCPGatewayClientWithNotifications(ctx context.Context, gatewayHost strin
 		sessionID: client.GetSessionId(),
 	}, nil
 }
+
+// NewMCPGatewayClientWithElicitation creates an MCP client with an elicitation handler.
+// Uses manual transport construction since NewStreamableHttpClient doesn't accept ClientOptions.
+func NewMCPGatewayClientWithElicitation(ctx context.Context, gatewayHost string, handler mcpclient.ElicitationHandler) (*mcpclient.Client, error) {
+	allHeaders := map[string]string{"e2e": "client"}
+	options := []transport.StreamableHTTPCOption{
+		transport.WithHTTPHeaders(allHeaders),
+		transport.WithContinuousListening(),
+	}
+	if strings.ToLower(useInsecureClient) == "true" {
+		GinkgoWriter.Println("using insecure client for tests")
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		httpClient := &http.Client{Transport: tr}
+		options = append(options, transport.WithHTTPBasicClient(httpClient))
+	}
+
+	trans, err := transport.NewStreamableHTTP(gatewayHost, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	clientOpts := []mcpclient.ClientOption{
+		mcpclient.WithElicitationHandler(handler),
+	}
+	gatewayClient := mcpclient.NewClient(trans, clientOpts...)
+
+	if err := gatewayClient.Start(ctx); err != nil {
+		return nil, err
+	}
+	_, err = gatewayClient.Initialize(ctx, mcp.InitializeRequest{
+		Params: mcp.InitializeParams{
+			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
+			Capabilities:    mcp.ClientCapabilities{},
+			ClientInfo: mcp.Implementation{
+				Name:    "e2e-elicitation",
+				Version: "0.0.1",
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return gatewayClient, nil
+}
