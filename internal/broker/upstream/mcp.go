@@ -120,6 +120,7 @@ func (up *MCPServer) Connect(ctx context.Context, onConnection func()) error {
 				}{
 					ListChanged: true,
 				},
+				Elicitation: &struct{}{},
 			},
 			ClientInfo: mcp.Implementation{
 				Name:    "mcp-broker",
