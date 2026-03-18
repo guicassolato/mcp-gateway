@@ -490,6 +490,7 @@ kubectl logs -n mcp-system -l app=mcp-gateway | grep -i session
 - Verify session hasn't expired (default timeout varies)
 - Check if broker pod restarted (loses in-memory sessions)
 - For multi-replica deployments, configure a Redis-based datastore as a shared session store — see **[Scaling the MCP Gateway](./scaling.md)**
+- If using a Redis session store, ensure the secret has label `mcp.kuadrant.io/secret: "true"` and contains a `REDIS_URL` data entry
 
 ## General Debugging
 
