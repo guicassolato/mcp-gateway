@@ -139,3 +139,15 @@
   - The message should identify the conflicting extension and listener
   - Only one ext_proc can handle a given port, so the oldest MCPGatewayExtension (by creation timestamp) wins
   - If the winning extension is deleted, the previously rejected extension should reconcile and become Ready
+
+### [Happy] Elicitation accept flow
+
+- When a client connects to the gateway with an elicitation handler that accepts requests and provides user information, and calls a tool that triggers an elicitation request, the gateway should broker the elicitation between the upstream server and the client. The tool response should indicate that the user provided the requested information.
+
+### [Happy] Elicitation decline flow
+
+- When a client connects to the gateway with an elicitation handler that declines requests, and calls a tool that triggers an elicitation request, the gateway should broker the elicitation between the upstream server and the client. The tool response should indicate that the user declined.
+
+### [Happy] Elicitation without handler errors
+
+- When a client connects to the gateway without an elicitation handler and calls a tool that triggers an elicitation request, the call should result in an error. The error may be a transport error or an error indicated in the tool result.
