@@ -91,7 +91,7 @@ func (r *MCPGatewayExtensionReconciler) buildBrokerRouterDeployment(mcpExt *mcpv
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: mcpExt.Spec.SessionStore.SecretName,
 					},
-					Key: "REDIS_URL",
+					Key: "CACHE_CONNECTION_STRING",
 				},
 			},
 		})

@@ -47,7 +47,7 @@
 
 | **Field** | **Type** | **Required** | **Description** |
 |-----------|----------|:------------:|-----------------|
-| `secretName` | String | Yes | Name of the secret containing a `REDIS_URL` data entry. The value should be a redis connection string (`redis://<user>:<pass>@<host>:<port>/<db>`). The secret must exist in the MCPGatewayExtension namespace and must have the label `mcp.kuadrant.io/secret: "true"`. Injected as `CACHE_CONNECTION_STRING` env var into the broker-router deployment |
+| `secretName` | String | Yes | Name of the secret containing a `CACHE_CONNECTION_STRING` data entry. The value should be a redis connection string (`redis://<user>:<pass>@<host>:<port>/<db>`). The secret must exist in the MCPGatewayExtension namespace and must have the label `mcp.kuadrant.io/secret: "true"`. Injected as `CACHE_CONNECTION_STRING` env var into the broker-router deployment |
 
 ## MCPGatewayExtensionStatus
 
@@ -70,4 +70,4 @@
 | `ReferenceGrantRequired` | A ReferenceGrant is missing for a cross-namespace Gateway reference |
 | `DeploymentNotReady` | The broker-router deployment is not ready |
 | `SecretNotFound` | A referenced secret is missing (trusted headers or session store) |
-| `SecretInvalid` | A referenced secret lacks the required data entry (`key` for trusted headers, `REDIS_URL` for session store) |
+| `SecretInvalid` | A referenced secret lacks the required data entry (`key` for trusted headers, `CACHE_CONNECTION_STRING` for session store) |

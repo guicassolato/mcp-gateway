@@ -181,7 +181,7 @@ spec:
     generate: true
 
   # references a secret for redis-based session storage
-  # secret must exist in the MCPGatewayExtension namespace and contain a REDIS_URL key
+  # secret must exist in the MCPGatewayExtension namespace and contain a CACHE_CONNECTION_STRING key
   # secret must have label mcp.kuadrant.io/secret: "true" (see Secret Label Requirement below)
   # value is injected as CACHE_CONNECTION_STRING env var into the broker-router deployment
   # when not set, in-memory session storage is used
@@ -211,7 +211,7 @@ metadata:
     mcp.kuadrant.io/secret: "true"  # required label
 type: Opaque
 stringData:
-  REDIS_URL: "redis://redis.team-a.svc.cluster.local:6379"
+  CACHE_CONNECTION_STRING: "redis://redis.team-a.svc.cluster.local:6379"
 ```
 
 ### Component Changes

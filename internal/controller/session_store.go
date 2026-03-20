@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// validateSessionStore checks that the session store secret exists and contains the REDIS_URL key.
+// validateSessionStore checks that the session store secret exists and contains the CACHE_CONNECTION_STRING key.
 func (r *MCPGatewayExtensionReconciler) validateSessionStore(ctx context.Context, mcpExt *mcpv1alpha1.MCPGatewayExtension) error {
 	if mcpExt.Spec.SessionStore == nil {
 		return nil
@@ -36,9 +36,14 @@ func (r *MCPGatewayExtensionReconciler) validateSessionStore(ctx context.Context
 		return newValidationError(mcpv1alpha1.ConditionReasonSecretInvalid,
 			fmt.Sprintf("session store secret %s has no data", secretName))
 	}
-	if _, ok := secret.Data["REDIS_URL"]; !ok {
+	val, ok := secret.Data["CACHE_CONNECTION_STRING"]
+	if !ok {
 		return newValidationError(mcpv1alpha1.ConditionReasonSecretInvalid,
-			fmt.Sprintf("session store secret %s is missing required data entry \"REDIS_URL\"", secretName))
+			fmt.Sprintf("session store secret %s is missing required data entry \"CACHE_CONNECTION_STRING\"", secretName))
+	}
+	if len(val) == 0 {
+		return newValidationError(mcpv1alpha1.ConditionReasonSecretInvalid,
+			fmt.Sprintf("session store secret %s has empty \"CACHE_CONNECTION_STRING\" value", secretName))
 	}
 
 	return nil

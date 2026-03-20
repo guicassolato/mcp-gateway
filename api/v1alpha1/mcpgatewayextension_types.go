@@ -78,7 +78,7 @@ type MCPGatewayExtensionSpec struct {
 	HTTPRouteManagement HTTPRouteManagementPolicy `json:"httpRouteManagement,omitempty"`
 
 	// SessionStore references a secret for redis-based session storage.
-	// The secret must exist in the MCPGatewayExtension namespace and contain a REDIS_URL key.
+	// The secret must exist in the MCPGatewayExtension namespace and contain a CACHE_CONNECTION_STRING key.
 	// The value is injected as CACHE_CONNECTION_STRING into the broker-router deployment.
 	// When not set, in-memory session storage is used.
 	// +optional
@@ -87,7 +87,7 @@ type MCPGatewayExtensionSpec struct {
 
 // SessionStore references a secret containing a redis connection string for session storage.
 type SessionStore struct {
-	// SecretName is the name of the secret containing the REDIS_URL key.
+	// SecretName is the name of the secret containing the CACHE_CONNECTION_STRING key.
 	// The value should be a redis connection string: redis://<user>:<pass>@<host>:<port>/<db>
 	// +required
 	// +kubebuilder:validation:MinLength=1

@@ -92,7 +92,7 @@ metadata:
     mcp.kuadrant.io/secret: "true"  # required label
 type: Opaque
 stringData:
-  REDIS_URL: "redis://redis.your-namespace.svc.cluster.local:6379"
+  CACHE_CONNECTION_STRING: "redis://redis.your-namespace.svc.cluster.local:6379"
 EOF
 ```
 
