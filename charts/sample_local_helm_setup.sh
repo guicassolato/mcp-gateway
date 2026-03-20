@@ -5,12 +5,13 @@
 
 set -e
 
-# Allow specifying a different GitHub org/user and branch via environment variables
+# Allow specifying a different GitHub org/user and version via environment variables
 GITHUB_ORG=${MCP_GATEWAY_ORG:-Kuadrant}
-BRANCH=${MCP_GATEWAY_BRANCH:-main}
+VERSION=${MCP_GATEWAY_VERSION:-0.5.1}
+GIT_REF="v${VERSION}"
 USE_LOCAL_CHART=${USE_LOCAL_CHART:-false}
 echo "Using GitHub org: $GITHUB_ORG"
-echo "Using branch: $BRANCH"
+echo "Using version: $VERSION (git ref: $GIT_REF)"
 echo "Using local chart: $USE_LOCAL_CHART"
 
 echo "Setting up MCP Gateway using Helm chart..."
@@ -52,15 +53,15 @@ helm upgrade --install istiod istio/istiod -n istio-system --wait
 kubectl create namespace gateway-system --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy test servers
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server1-deployment.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server1-service.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server1-httproute.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server1-httproute-ext.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server2-deployment.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server2-service.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server2-httproute.yaml -n mcp-test
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/test-servers/server2-httproute-ext.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server1-deployment.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server1-service.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server1-httproute.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server1-httproute-ext.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server2-deployment.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server2-service.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server2-httproute.yaml -n mcp-test
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/test-servers/server2-httproute-ext.yaml -n mcp-test
 
 # Patch test server images, usually used for local dev built images, to pull images from remote
 kubectl patch deployment mcp-test-server1 -n mcp-test --type='json' -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"IfNotPresent"}]'
@@ -88,7 +89,7 @@ else
     helm upgrade --install mcp-gateway oci://ghcr.io/kuadrant/charts/mcp-gateway \
         --create-namespace \
         --namespace mcp-system \
-        --version 0.5.0 \
+        --version $VERSION \
         --set broker.create=true \
         --set gateway.create=true \
         --set gateway.name=mcp-gateway \
@@ -102,7 +103,7 @@ else
 fi
 
 # Apply MCPServerRegistration samples
-kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$BRANCH/config/samples/mcpserverregistration-test-servers-base.yaml
+kubectl apply -f https://raw.githubusercontent.com/$GITHUB_ORG/mcp-gateway/$GIT_REF/config/samples/mcpserverregistration-test-servers-base.yaml
 
 echo "Waiting for MCP Gateway deployments to be created..."
 for deploy in mcp-gateway mcp-gateway-controller; do

@@ -38,26 +38,14 @@ else
     echo "Warning: $OPENSHIFT_SCRIPT not found"
 fi
 
-# Update charts/sample_local_helm_setup.sh
+# Update charts/sample_local_helm_setup.sh default version
 SAMPLE_SCRIPT="$REPO_ROOT/charts/sample_local_helm_setup.sh"
 if [ -f "$SAMPLE_SCRIPT" ]; then
-    sed -i.bak -E "s/--version [0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?/--version $VERSION/" "$SAMPLE_SCRIPT"
+    sed -i.bak -E "s/MCP_GATEWAY_VERSION:-[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?/MCP_GATEWAY_VERSION:-$VERSION/" "$SAMPLE_SCRIPT"
     rm -f "$SAMPLE_SCRIPT.bak"
     echo "Updated: $SAMPLE_SCRIPT"
 else
     echo "Warning: $SAMPLE_SCRIPT not found"
-fi
-
-# Update docs/guides/quick-start.md release branch reference
-QUICK_START="$REPO_ROOT/docs/guides/quick-start.md"
-if [ -f "$QUICK_START" ]; then
-    # extract major.minor.patch (strip any pre-release suffix) for branch name
-    BRANCH_VERSION=$(echo "$VERSION" | sed -E 's/-.*//')
-    sed -i.bak -E "s/MCP_GATEWAY_BRANCH=release-[0-9]+\.[0-9]+\.[0-9]+/MCP_GATEWAY_BRANCH=release-$BRANCH_VERSION/" "$QUICK_START"
-    rm -f "$QUICK_START.bak"
-    echo "Updated: $QUICK_START"
-else
-    echo "Warning: $QUICK_START not found"
 fi
 
 # Update config/mcp-system deployment images
@@ -89,6 +77,20 @@ else
     echo "Warning: $CSV_BASE not found"
 fi
 
+# Update docs/guides MCP_GATEWAY_VERSION
+for GUIDE in \
+    "$REPO_ROOT/docs/guides/quick-start.md" \
+    "$REPO_ROOT/docs/guides/isolated-gateway-deployment.md" \
+    "$REPO_ROOT/docs/guides/how-to-install-and-configure.md"; do
+    if [ -f "$GUIDE" ]; then
+        sed -i.bak -E "s/MCP_GATEWAY_VERSION=[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?/MCP_GATEWAY_VERSION=$VERSION/" "$GUIDE"
+        rm -f "$GUIDE.bak"
+        echo "Updated: $GUIDE"
+    else
+        echo "Warning: $GUIDE not found"
+    fi
+done
+
 # Update OLM CatalogSource image tag
 CATALOG_SOURCE="$REPO_ROOT/config/deploy/olm/catalogsource.yaml"
 if [ -f "$CATALOG_SOURCE" ]; then
@@ -100,15 +102,6 @@ else
 fi
 
 echo "Done. Version set to $VERSION"
-echo ""
-echo "Files updated:"
-echo "  - config/openshift/deploy_openshift.sh"
-echo "  - charts/sample_local_helm_setup.sh"
-echo "  - docs/guides/quick-start.md"
-echo "  - config/mcp-system/deployment-controller.yaml"
-echo "  - config/mcp-system/deployment-broker.yaml"
-echo "  - config/manifests/bases/mcp-gateway.clusterserviceversion.yaml"
-echo "  - config/deploy/olm/catalogsource.yaml"
 echo ""
 echo "After updating, regenerate the bundle with: make bundle VERSION=$VERSION"
 echo "Review changes with: git diff"
