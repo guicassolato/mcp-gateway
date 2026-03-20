@@ -13,7 +13,7 @@ gateway:
   listener:
     name: mcp
     port: 8080
-  class: istio
+  class: openshift-default
   labels:
     istio: ingressgateway
 
