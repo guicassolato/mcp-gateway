@@ -179,6 +179,39 @@ spec:
   trustedHeadersKey:
     secretName: trusted-headers-key
     generate: true
+
+  # references a secret for redis-based session storage
+  # secret must exist in the MCPGatewayExtension namespace and contain a CACHE_CONNECTION_STRING key
+  # secret must have label mcp.kuadrant.io/secret: "true" (see Secret Label Requirement below)
+  # value is injected as CACHE_CONNECTION_STRING env var into the broker-router deployment
+  # when not set, in-memory session storage is used
+  # +optional
+  sessionStore:
+    secretName: redis-credentials
+```
+
+#### Secret Label Requirement
+
+All user-provided secrets referenced by MCP Gateway resources must have the label `mcp.kuadrant.io/secret: "true"`. This applies to:
+
+- **Credential secrets** referenced by `MCPServerRegistration.spec.credentialRef`
+- **Session store secrets** (e.g. Redis) referenced by `MCPGatewayExtension.spec.sessionStore`
+
+Without this label, the controller will reject the resource with a validation error. The label acts as an explicit opt-in, ensuring the controller only watches and reads secrets that are intended for use with the MCP Gateway.
+
+Example Redis session store secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+  namespace: team-a
+  labels:
+    mcp.kuadrant.io/secret: "true"  # required label
+type: Opaque
+stringData:
+  CACHE_CONNECTION_STRING: "redis://redis.team-a.svc.cluster.local:6379"
 ```
 
 ### Component Changes

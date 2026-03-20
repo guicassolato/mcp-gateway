@@ -78,19 +78,22 @@ Wait for the datastore to be ready:
 kubectl rollout status deployment/redis -n your-namespace
 ```
 
-## Step 2: Configure the Gateway Connection
+## Step 2: Create the Redis Credentials Secret
 
-Configure the MCP Gateway to use the datastore by adding the `--cache-connection-string` flag to the gateway deployment's command:
-
-```bash
-kubectl patch deployment mcp-gateway -n mcp-system --type=json \
-  -p '[{"op":"add","path":"/spec/template/spec/containers/0/command/-","value":"--cache-connection-string=redis://redis.your-namespace.svc.cluster.local:6379"}]'
-```
-
-Wait for the rollout to complete:
+Create a secret containing the Redis connection URL. The secret must have the `mcp.kuadrant.io/secret: "true"` label — without it, the MCPGatewayExtension will fail validation.
 
 ```bash
-kubectl rollout status deployment/mcp-gateway -n mcp-system
+kubectl apply -n your-namespace -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-credentials
+  labels:
+    mcp.kuadrant.io/secret: "true"  # required label
+type: Opaque
+stringData:
+  CACHE_CONNECTION_STRING: "redis://redis.your-namespace.svc.cluster.local:6379"
+EOF
 ```
 
 **Connection String Format:**
@@ -101,9 +104,19 @@ redis://<user>:<password>@<host>:<port>/<db>
 
 For an instance without authentication in the same cluster, the host is typically `<service-name>.<namespace>.svc.cluster.local`.
 
-> **Note:** The `--cache-connection-string` flag is in the controller's ignored flags list, so the MCPGatewayExtension controller will not revert this change during reconciliation. Do not use `kubectl set env` as the controller will revert environment variable changes.
+## Step 3: Configure the MCPGatewayExtension
 
-## Step 3: Scale the Gateway
+Add the `sessionStore` field to your MCPGatewayExtension to reference the Redis credentials secret:
+
+```yaml
+spec:
+  sessionStore:
+    secretName: redis-credentials
+```
+
+The operator will inject the Redis connection string as the `CACHE_CONNECTION_STRING` env var into the broker-router deployment.
+
+## Step 4: Scale the Gateway
 
 With the datastore configured, scale the gateway to multiple replicas:
 
@@ -117,7 +130,7 @@ Verify all replicas are ready:
 kubectl rollout status deployment/mcp-gateway -n mcp-system
 ```
 
-## Step 4: Verify Session Sharing
+## Step 5: Verify Session Sharing
 
 Confirm that the external store is active by checking the gateway logs. You should see `session cache using external store` on startup:
 
@@ -131,20 +144,11 @@ Test that sessions are shared across replicas by making multiple tool calls from
 
 To revert to in-memory session caching:
 
-1. Scale down to a single replica:
+1. Remove the `sessionStore` field from your MCPGatewayExtension.
+
+2. Scale down to a single replica:
    ```bash
    kubectl scale deployment/mcp-gateway -n mcp-system --replicas=1
-   ```
-
-2. Remove the cache connection flag (replace `INDEX` with the position of the flag in the command array):
-   ```bash
-   # Find the index of the --cache-connection-string flag
-   kubectl get deployment mcp-gateway -n mcp-system \
-     -o jsonpath='{.spec.template.spec.containers[0].command}'
-
-   # Remove it by index (e.g., if it's the last element at index 7)
-   kubectl patch deployment mcp-gateway -n mcp-system --type=json \
-     -p '[{"op":"remove","path":"/spec/template/spec/containers/0/command/INDEX"}]'
    ```
 
 3. Wait for the rollout to complete:
