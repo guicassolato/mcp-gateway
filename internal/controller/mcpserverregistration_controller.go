@@ -74,15 +74,12 @@ type MCPReconciler struct {
 	MCPExtFinderValidator MCPGatewayExtensionFinderValidator
 }
 
-// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations/status,verbs=get;update
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
-// +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes/status,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;delete
+// +kubebuilder:rbac:groups="",resources=services,verbs=get
 
 // TODO: consider making targetRef immutable since changing it is not currently handled
 

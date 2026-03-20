@@ -35,8 +35,8 @@ type MCPVirtualServerReconciler struct {
 
 var defaultRequeueTime = time.Second * 2
 
-// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers/status,verbs=get;update
 // +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
