@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"strings"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/mark3labs/mcp-go/mcp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -252,12 +255,34 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 
 	It("[Full] Redis session cache persists backend sessions across pod restarts", func() {
 		deploymentName := "mcp-gateway"
-		redisFlag := fmt.Sprintf("--cache-connection-string=redis://redis.%s.svc.cluster.local:6379", SystemNamespace)
+		redisSecretName := "redis-session-store"
+		redisConnectionString := fmt.Sprintf("redis://redis.%s.svc.cluster.local:6379", SystemNamespace)
+
+		By("Creating Redis session store secret")
+		redisSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      redisSecretName,
+				Namespace: SystemNamespace,
+				Labels: map[string]string{
+					"mcp.kuadrant.io/secret": "true",
+					"e2e":                    "test",
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+			StringData: map[string]string{
+				"CACHE_CONNECTION_STRING": redisConnectionString,
+			},
+		}
+		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, redisSecret))).To(Succeed())
 
 		DeferCleanup(func() {
-			By("Cleanup: removing cache-connection-string flag")
-			Expect(RemoveDeploymentCommandFlag(SystemNamespace, deploymentName, redisFlag)).To(Succeed())
+			By("Cleanup: removing sessionStore from MCPGatewayExtension")
+			ext := &mcpv1alpha1.MCPGatewayExtension{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+			ext.Spec.SessionStore = nil
+			Expect(k8sClient.Update(ctx, ext)).To(Succeed())
 			Expect(WaitForDeploymentReady(SystemNamespace, deploymentName, 1)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, redisSecret)).To(Succeed())
 		})
 
 		By("Registering an MCP server")
@@ -276,8 +301,11 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		gen, err := GetDeploymentGeneration(SystemNamespace, deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Enabling Redis session cache on the gateway")
-		Expect(AddDeploymentCommandFlag(SystemNamespace, deploymentName, redisFlag)).To(Succeed())
+		By("Enabling Redis session cache via sessionStore on MCPGatewayExtension")
+		ext := &mcpv1alpha1.MCPGatewayExtension{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+		ext.Spec.SessionStore = &mcpv1alpha1.SessionStore{SecretName: redisSecretName}
+		Expect(k8sClient.Update(ctx, ext)).To(Succeed())
 
 		By("Waiting for gateway rollout after enabling Redis")
 		Expect(WaitForDeploymentReplicas(SystemNamespace, deploymentName, 1, gen)).To(Succeed())
