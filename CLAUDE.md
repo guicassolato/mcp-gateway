@@ -127,6 +127,9 @@ cd tests/e2e && go test -v -tags=e2e -run TestE2E -ginkgo.focus="test descriptio
 ginkgo run -v --tags=e2e --focus="test description" tests/e2e/
 ```
 
+### Version References
+Docs and scripts on `main` always reference the latest published release version (plain SemVer, e.g., `0.5.1`). Git refs use a `v` prefix (e.g., `v${MCP_GATEWAY_VERSION}`), Helm `--version` uses bare SemVer. The `scripts/set-release-version.sh` script updates all version references and is run as part of the release process and the post-release bump on `main`.
+
 ### Important Ports
 - 8080: Broker HTTP (/mcp endpoint)
 - 50051: Router gRPC (ext_proc)

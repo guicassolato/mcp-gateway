@@ -27,8 +27,8 @@ MCP Gateway runs on Kubernetes and integrates with Gateway API and Istio. You sh
 ### Step 1: Install CRDs
 
 ```bash
-export MCP_GATEWAY_VERSION=main  # or a specific version tag
-kubectl apply -k "https://github.com/kuadrant/mcp-gateway/config/crd?ref=${MCP_GATEWAY_VERSION}"
+export MCP_GATEWAY_VERSION=0.5.1
+kubectl apply -k "https://github.com/kuadrant/mcp-gateway/config/crd?ref=v${MCP_GATEWAY_VERSION}"
 ```
 
 Verify CRDs are installed:

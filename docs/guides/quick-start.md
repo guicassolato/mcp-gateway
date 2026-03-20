@@ -28,14 +28,14 @@ Perfect for evaluation, demos, and getting started quickly.
 Set the release version to install:
 
 ```bash
-export MCP_GATEWAY_BRANCH=release-0.5.0
+export MCP_GATEWAY_VERSION=0.5.1
 ```
 
 Run the automated setup script:
 
 ```bash
 # Download and run the setup script
-curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/${MCP_GATEWAY_BRANCH}/charts/sample_local_helm_setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/v${MCP_GATEWAY_VERSION}/charts/sample_local_helm_setup.sh | bash
 ```
 
 **Or clone the repository and run locally:**
@@ -43,7 +43,7 @@ curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/${MCP_GATEWAY_B
 ```bash
 git clone https://github.com/Kuadrant/mcp-gateway.git
 cd mcp-gateway
-git checkout $MCP_GATEWAY_BRANCH
+git checkout v${MCP_GATEWAY_VERSION}
 USE_LOCAL_CHART=true ./charts/sample_local_helm_setup.sh
 ```
 

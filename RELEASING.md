@@ -24,14 +24,7 @@ Run the version update script with the full version including any RC suffix:
 ./scripts/set-release-version.sh X.Y.Z
 ```
 
-This updates version references in:
-- `config/openshift/deploy_openshift.sh`
-- `charts/sample_local_helm_setup.sh`
-- `docs/guides/quick-start.md`
-- `config/mcp-system/deployment-controller.yaml`
-- `config/mcp-system/deployment-broker.yaml`
-- `config/manifests/bases/mcp-gateway.clusterserviceversion.yaml`
-- `config/deploy/olm/catalogsource.yaml`
+This updates version references across deployment scripts, docs, and manifests. Review changes with `git diff`.
 
 If CRD or API type changes are included in this release, regenerate all manifests first:
 ```bash
@@ -49,10 +42,7 @@ make bundle VERSION=X.Y.Z
 
 Commit and push:
 ```bash
-git add config/openshift/deploy_openshift.sh charts/sample_local_helm_setup.sh \
-  docs/guides/quick-start.md config/mcp-system/deployment-controller.yaml \
-  config/mcp-system/deployment-broker.yaml config/manifests/bases/ \
-  config/deploy/olm/catalogsource.yaml bundle/
+git add -u config/ charts/ docs/ bundle/
 git commit -s -m "Update version to X.Y.Z-rcN"
 git push -u origin release-X.Y
 ```
@@ -103,10 +93,7 @@ git pull
 git checkout -b bump-version-X.Y.Z
 ./scripts/set-release-version.sh X.Y.Z
 make bundle VERSION=X.Y.Z
-git add config/openshift/deploy_openshift.sh charts/sample_local_helm_setup.sh \
-  docs/guides/quick-start.md config/mcp-system/deployment-controller.yaml \
-  config/mcp-system/deployment-broker.yaml config/manifests/bases/ \
-  config/deploy/olm/catalogsource.yaml bundle/
+git add -u config/ charts/ docs/ bundle/
 git commit -s -m "Update version to X.Y.Z"
 git push -u origin bump-version-X.Y.Z
 ```
