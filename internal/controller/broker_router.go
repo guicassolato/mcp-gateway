@@ -48,6 +48,13 @@ var managedCommandFlags = []string{
 	"--mcp-router-key",
 }
 
+// managedEnvVarNames are the env var names the controller owns and reconciles.
+// Any env var not in this list is user-managed and preserved as-is.
+var managedEnvVarNames = []string{
+	"TRUSTED_HEADER_PUBLIC_KEY",
+	"CACHE_CONNECTION_STRING",
+}
+
 func brokerRouterLabels() map[string]string {
 	return map[string]string{
 		labelAppName:   brokerRouterName,
@@ -311,7 +318,7 @@ func (r *MCPGatewayExtensionReconciler) reconcileBrokerRouter(ctx context.Contex
 		existingContainer.Command = mergeCommand(desiredContainer.Command, existingContainer.Command)
 		existingContainer.Image = desiredContainer.Image
 		existingContainer.Ports = desiredContainer.Ports
-		existingContainer.Env = desiredContainer.Env
+		existingContainer.Env = mergeEnvVars(desiredContainer.Env, existingContainer.Env)
 		existingContainer.VolumeMounts = desiredContainer.VolumeMounts
 		existingDeployment.Spec.Template.Spec.Containers[0] = existingContainer
 		existingDeployment.Spec.Template.Spec.Volumes = deployment.Spec.Template.Spec.Volumes
@@ -430,8 +437,11 @@ func deploymentNeedsUpdate(desired, existing *appsv1.Deployment) (bool, string) 
 	if !equality.Semantic.DeepEqual(desired.Spec.Template.Spec.Volumes, existing.Spec.Template.Spec.Volumes) {
 		return true, fmt.Sprintf("volumes changed: %+v -> %+v", existing.Spec.Template.Spec.Volumes, desired.Spec.Template.Spec.Volumes)
 	}
-	if !equality.Semantic.DeepEqual(desiredContainer.Env, existingContainer.Env) {
-		return true, fmt.Sprintf("env changed: %+v -> %+v", existingContainer.Env, desiredContainer.Env)
+	// only compare env vars the controller manages; user-added env vars are preserved
+	desiredEnv := filterManagedEnvVars(desiredContainer.Env)
+	existingEnv := filterManagedEnvVars(existingContainer.Env)
+	if !equality.Semantic.DeepEqual(desiredEnv, existingEnv) {
+		return true, fmt.Sprintf("env changed: %+v -> %+v", existingEnv, desiredEnv)
 	}
 	return false, ""
 }
@@ -466,6 +476,30 @@ func mergeCommand(desired, existing []string) []string {
 		}
 	}
 	return slices.Concat(desired, userFlags)
+}
+
+// filterManagedEnvVars returns only env vars the controller manages.
+func filterManagedEnvVars(envVars []corev1.EnvVar) []corev1.EnvVar {
+	var out []corev1.EnvVar
+	for _, ev := range envVars {
+		if slices.Contains(managedEnvVarNames, ev.Name) {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+// mergeEnvVars takes the desired env vars from the controller and the existing
+// env vars from the deployment. It returns a merged list that preserves any
+// user-added env vars while updating controller-managed env vars.
+func mergeEnvVars(desired, existing []corev1.EnvVar) []corev1.EnvVar {
+	var userEnvVars []corev1.EnvVar
+	for _, ev := range existing {
+		if !slices.Contains(managedEnvVarNames, ev.Name) {
+			userEnvVars = append(userEnvVars, ev)
+		}
+	}
+	return slices.Concat(desired, userEnvVars)
 }
 
 func (r *MCPGatewayExtensionReconciler) buildGatewayHTTPRoute(mcpExt *mcpv1alpha1.MCPGatewayExtension, publicHost string) *gatewayv1.HTTPRoute {
