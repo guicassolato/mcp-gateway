@@ -7,9 +7,15 @@ MCP_GATEWAY_HOST="${MCP_GATEWAY_HOST:-mcp.apps.$(oc get dns cluster -o jsonpath=
 MCP_GATEWAY_NAMESPACE="${MCP_GATEWAY_NAMESPACE:-mcp-system}"
 GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-gateway-system}"
 INSTALL_RHCL="${INSTALL_RHCL:-true}"
-INSTALL_OSSM3="${INSTALL_OSSM3:-true}"
+INSTALL_SERVICE_MESH="${INSTALL_SERVICE_MESH:-true}"
 USE_OCP_INGRESS="${USE_OCP_INGRESS:-true}"
-GATEWAY_CLASS_NAME="openshift-default"
+
+# GATEWAY_CLASS_NAME value depends on how Service Mesh was (or is about to be) installed
+if [ "$USE_OCP_INGRESS" = "true" ]; then
+  GATEWAY_CLASS_NAME="${GATEWAY_CLASS_NAME:-openshift-default}"
+else
+  GATEWAY_CLASS_NAME="${GATEWAY_CLASS_NAME:-istio}"
+fi
 
 SCRIPT_BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -18,7 +24,7 @@ command -v oc >/dev/null 2>&1 || { echo >&2 "OpenShift CLI is required but not i
 command -v helm >/dev/null 2>&1 || { echo >&2 "Helm is required but not installed. Aborting."; exit 1; }
 
 # Install Service Mesh
-if [ "$INSTALL_OSSM3" = "true" ]; then
+if [ "$INSTALL_SERVICE_MESH" = "true" ]; then
   if [ "$USE_OCP_INGRESS" = "true" ]; then
     echo "Using OpenShift Cluster Ingress (GatewayClass) to install Service Mesh Operator"
     oc apply -k "$SCRIPT_BASE_DIR/kustomize/ocp-ingress/base"
@@ -33,12 +39,9 @@ if [ "$INSTALL_OSSM3" = "true" ]; then
     # Install Service Mesh Instance
     echo "Installing Service Mesh Instance..."
     oc apply -k "$SCRIPT_BASE_DIR/kustomize/service-mesh/instance/base"
-
-    # Different GatewayClass name must be used if Service Mesh is installed via OLM
-    GATEWAY_CLASS_NAME="istio"
   fi
 else
-  echo "Skipping Service Mesh installation (INSTALL_OSSM3=$INSTALL_OSSM3)..."
+  echo "Skipping Service Mesh installation (INSTALL_SERVICE_MESH=$INSTALL_SERVICE_MESH)..."
 fi
 
 # Install Connectivity Link Operator
