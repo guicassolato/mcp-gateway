@@ -7,6 +7,7 @@ import (
 	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1314,6 +1315,124 @@ func TestMergeCommand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFilterManagedEnvVars(t *testing.T) {
+	tests := []struct {
+		name string
+		env  []corev1.EnvVar
+		want []corev1.EnvVar
+	}{
+		{
+			name: "only managed vars returned",
+			env: []corev1.EnvVar{
+				{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"},
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+				{Name: "CACHE_CONNECTION_STRING", Value: "redis://localhost"},
+			},
+			want: []corev1.EnvVar{
+				{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"},
+				{Name: "CACHE_CONNECTION_STRING", Value: "redis://localhost"},
+			},
+		},
+		{
+			name: "no managed vars",
+			env: []corev1.EnvVar{
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+			},
+			want: nil,
+		},
+		{
+			name: "empty input",
+			env:  nil,
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterManagedEnvVars(tt.env)
+			if !equality.Semantic.DeepEqual(got, tt.want) {
+				t.Errorf("filterManagedEnvVars() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		desired  []corev1.EnvVar
+		existing []corev1.EnvVar
+		want     []corev1.EnvVar
+	}{
+		{
+			name:     "no user vars",
+			desired:  []corev1.EnvVar{{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"}},
+			existing: []corev1.EnvVar{{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"}},
+			want:     []corev1.EnvVar{{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"}},
+		},
+		{
+			name:    "preserves user vars from existing",
+			desired: []corev1.EnvVar{{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"}},
+			existing: []corev1.EnvVar{
+				{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "old-key"},
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+				{Name: "OAUTH_AUTHORIZATION_SERVERS", Value: "http://keycloak/realms/mcp"},
+			},
+			want: []corev1.EnvVar{
+				{Name: "TRUSTED_HEADER_PUBLIC_KEY", Value: "key1"},
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+				{Name: "OAUTH_AUTHORIZATION_SERVERS", Value: "http://keycloak/realms/mcp"},
+			},
+		},
+		{
+			name:    "no desired managed vars still preserves user vars",
+			desired: nil,
+			existing: []corev1.EnvVar{
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+			},
+			want: []corev1.EnvVar{
+				{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeEnvVars(tt.desired, tt.existing)
+			if !equality.Semantic.DeepEqual(got, tt.want) {
+				t.Errorf("mergeEnvVars() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeploymentNeedsUpdate_UserEnvVarsIgnored(t *testing.T) {
+	base := func() *appsv1.Deployment {
+		return &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name:  "mcp-gateway",
+							Image: "test:latest",
+						}},
+					},
+				},
+			},
+		}
+	}
+
+	desired := base()
+	existing := base()
+	existing.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+		{Name: "OAUTH_RESOURCE_NAME", Value: "MCP Server"},
+		{Name: "OAUTH_AUTHORIZATION_SERVERS", Value: "http://keycloak/realms/mcp"},
+	}
+
+	needsUpdate, _ := deploymentNeedsUpdate(desired, existing)
+	if needsUpdate {
+		t.Error("deploymentNeedsUpdate() should not trigger for user-added env vars")
 	}
 }
 
