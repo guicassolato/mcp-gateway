@@ -18,6 +18,7 @@ spec:
   {{- if .Values.gateway.publicHost }}
   publicHost: {{ .Values.gateway.publicHost | quote }}
   {{- end }}
+  privateHost: {{ printf "%s-%s.%s.svc.cluster.local:%v" .Values.gateway.name .Values.gateway.gatewayClassName .Values.gateway.namespace .Values.gateway.port | quote }}
   {{- if .Values.broker.pollInterval }}
   backendPingIntervalSeconds: {{ .Values.broker.pollInterval }}
   {{- end }}
