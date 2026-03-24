@@ -11,6 +11,14 @@ RUN git clone --branch v0.1.15 --depth 1 https://github.com/modelcontextprotocol
 
 WORKDIR /app
 
+# Replace the express app setup section to disable DNS rebinding protection.
+# Upstream v0.1.15 uses createMcpExpressApp() which rejects non-localhost
+# Host headers, incompatible with in-cluster k8s service hostnames.
+COPY start.ts /tmp/start.ts
+RUN head -n 1055 everything-server.ts > temp.ts && \
+    cat /tmp/start.ts >> temp.ts && \
+    mv temp.ts everything-server.ts
+
 RUN npm install
 
 FROM mirror.gcr.io/node:24-alpine AS release
