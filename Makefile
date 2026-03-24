@@ -293,7 +293,7 @@ deploy-example: install-crd ## Deploy example MCPServerRegistration resource
 build-test-servers: ## Build test server Docker images locally
 	@echo "Building test server images..."
 	cd tests/servers/server1 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server1:latest .
-	cd tests/servers/server2 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server2:latest .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -f tests/servers/server2/Dockerfile -t ghcr.io/kuadrant/mcp-gateway/test-server2:latest .
 	cd tests/servers/server3 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server3:latest .
 	cd tests/servers/api-key-server && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-api-key-server:latest .
 	cd tests/servers/broken-server && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-broken-server:latest .
