@@ -74,9 +74,9 @@ type MCPReconciler struct {
 	MCPExtFinderValidator MCPGatewayExtensionFinderValidator
 }
 
-// +kubebuilder:rbac:groups=mcp.kagenti.com,resources=mcpserverregistrations,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=mcp.kagenti.com,resources=mcpserverregistrations/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=mcp.kagenti.com,resources=mcpvirtualservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpserverregistrations/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=mcp.kuadrant.io,resources=mcpvirtualservers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete

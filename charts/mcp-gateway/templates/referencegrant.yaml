@@ -9,7 +9,7 @@ metadata:
     {{- include "mcp-gateway.labels" . | nindent 4 }}
 spec:
   from:
-    - group: mcp.kagenti.com
+    - group: mcp.kuadrant.io
       kind: MCPGatewayExtension
       namespace: {{ .Release.Namespace }}
   to:

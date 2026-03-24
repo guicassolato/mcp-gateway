@@ -5,7 +5,7 @@ metadata:
   namespace: gateway-system
 spec:
   from:
-    - group: mcp.kagenti.com
+    - group: mcp.kuadrant.io
       kind: MCPGatewayExtension
       namespace: mcp-system
   to:

@@ -38,7 +38,7 @@ The MCPGatewayExtension can target Gateway API `Gateway` resources in any namesp
 **Example Resources:**
 
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPGatewayExtension
 metadata:
   name: team1
@@ -63,7 +63,7 @@ metadata:
   namespace: gateway-system
 spec:
   from:
-    - group: mcp.kagenti.com
+    - group: mcp.kuadrant.io
       kind: MCPGatewayExtension
       namespace: team1
   to:

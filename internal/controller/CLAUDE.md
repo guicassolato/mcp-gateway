@@ -3,7 +3,7 @@
 ## MCPServerRegistration Resource
 
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: weather-service
@@ -34,7 +34,7 @@ MCPServerRegistration CRD has optional `path` field (defaults to `/mcp`):
 
 Example:
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: custom-path-server

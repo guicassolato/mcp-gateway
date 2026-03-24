@@ -38,7 +38,7 @@ Create virtual servers for different use cases using tools from your configured 
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPVirtualServer
 metadata:
   name: dev-tools
@@ -57,7 +57,7 @@ EOF
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPVirtualServer
 metadata:
   name: data-tools

@@ -64,7 +64,7 @@ kubectl get namespace mcp-system
 kubectl get deployments -n mcp-system
 
 # check CRDs
-kubectl get crd mcpserverregistrations.mcp.kagenti.com
+kubectl get crd mcpserverregistrations.mcp.kuadrant.io
 ```
 
 ## Next Steps
@@ -96,7 +96,7 @@ spec:
 ## Example MCPServerRegistration
 
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: my-mcp-server

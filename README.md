@@ -161,7 +161,7 @@ Each `MCPServer` resource:
 Create `MCPServer` resources that reference HTTPRoutes:
 
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: weather-tools
@@ -172,7 +172,7 @@ spec:
     name: weather-route
   toolPrefix: weather_
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: calendar-tools

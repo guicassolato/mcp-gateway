@@ -1,11 +1,11 @@
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: test-server3
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   toolPrefix: test3_
   targetRef:
@@ -14,13 +14,13 @@ spec:
     kind: HTTPRoute
     name: mcp-server3-route
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: api-key-server
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   toolPrefix: apikey_
   targetRef:
@@ -32,13 +32,13 @@ spec:
     name: api-key-server-credentials
     key: token
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: custom-path-server
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   # custom path - this server uses /v1/special/mcp instead of /mcp
   path: /v1/special/mcp
@@ -49,13 +49,13 @@ spec:
     kind: HTTPRoute
     name: mcp-custom-path-server
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: oidc-server
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   # Validates OpenID Connect (OIDC) Bearer tokens issued by a configured OIDC provider
   toolPrefix: oidc_
@@ -67,13 +67,13 @@ spec:
     name: oidc-server-credentials
     key: admin_token
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: everything-server
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   toolPrefix: everything_
   targetRef:
@@ -82,13 +82,13 @@ spec:
     kind: HTTPRoute
     name: everything-server-route
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: custom-response
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   toolPrefix: custom_resp_
   targetRef:

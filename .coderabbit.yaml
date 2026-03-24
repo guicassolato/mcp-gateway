@@ -29,7 +29,7 @@ reviews:
     # generated deepcopy
     - "!**/zz_generated.deepcopy.go"
     # generated CRDs
-    - "!config/crd/mcp.kagenti.com_*.yaml"
+    - "!config/crd/mcp.kuadrant.io_*.yaml"
     # vendored gateway-api and istio CRDs
     - "!config/crd/gateway-api/**"
     - "!config/crd/istio/**"

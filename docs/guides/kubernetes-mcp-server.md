@@ -21,7 +21,7 @@ In this use case, the Kubernetes MCP server does not handle authentication for t
 Clone the MCP Gateway repo (so you have the tooling to easily setup a local dev/test environment):
 
 ```sh
-git clone git@github.com:kagenti/mcp-gateway.git && cd mcp-gateway
+git clone git@github.com:Kuadrant/mcp-gateway.git && cd mcp-gateway
 ```
 
 Create a local cluster with MCP Gateway:
@@ -134,7 +134,7 @@ spec:
   location: MESH_EXTERNAL
   resolution: DNS
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: kubernetes-mcp-server

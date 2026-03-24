@@ -156,7 +156,7 @@ kubectl describe mcpgatewayextension <name> -n <namespace>
     namespace: <gateway-namespace>
   spec:
     from:
-      - group: mcp.kagenti.com
+      - group: mcp.kuadrant.io
         kind: MCPGatewayExtension
         namespace: <mcpgatewayextension-namespace>
     to:
