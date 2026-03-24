@@ -6,11 +6,13 @@ on:
     branches: [main]
     paths:
       - 'tests/servers/**'
+      - 'internal/tests/**'
       - '.github/workflows/test-images.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'tests/servers/**'
+      - 'internal/tests/**'
       - '.github/workflows/test-images.yaml'
 
 concurrency:
