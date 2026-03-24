@@ -36,8 +36,8 @@ jobs:
             dockerfile: Dockerfile
             image-name: test-server1
           - server: server2
-            context: tests/servers/server2
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: tests/servers/server2/Dockerfile
             image-name: test-server2
           - server: server3
             context: tests/servers/server3
