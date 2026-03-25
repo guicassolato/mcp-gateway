@@ -1,0 +1,43 @@
+# simplified mcps-auth-policy for CI: JWT + tool-access-check only.
+# the full token-exchange version (config/samples/oauth-token-exchange/tools-call-auth.yaml)
+# requires Vault and is tested separately.
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: mcps-auth-policy
+  namespace: gateway-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: mcp-gateway
+    sectionName: mcps
+  rules:
+    authentication:
+      'keycloak':
+        jwt:
+          issuerUrl: https://keycloak.127-0-0-1.sslip.io:8002/realms/mcp
+    authorization:
+      'tool-access-check':
+        patternMatching:
+          patterns:
+            - predicate: |
+                request.headers['x-mcp-toolname'] in (has(auth.identity.resource_access) && auth.identity.resource_access.exists(p, p == request.headers['x-mcp-servername']) ? auth.identity.resource_access[request.headers['x-mcp-servername']].roles : [])
+    response:
+      unauthenticated:
+        headers:
+          'WWW-Authenticate':
+            value: Bearer resource_metadata=http://mcp.127-0-0-1.sslip.io:8001/.well-known/oauth-protected-resource/mcp
+        body:
+          value: |
+            {
+              "error": "Unauthorized",
+              "message": "MCP Tool Access denied: Authentication required."
+            }
+      unauthorized:
+        body:
+          value: |
+            {
+              "error": "Forbidden",
+              "message": "MCP Tool Access denied: Insufficient permissions for this tool."
+            }

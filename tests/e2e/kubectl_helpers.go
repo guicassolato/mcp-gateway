@@ -143,7 +143,18 @@ func RemoveDeploymentCommandFlag(namespace, deploymentName, flag string) error {
 // IsTrustedHeadersEnabled checks if the gateway has trusted headers public key configured
 func IsTrustedHeadersEnabled() bool {
 	cmd := exec.Command("kubectl", "get", "deployment", "-n", SystemNamespace,
-		"mcp-broker-router", "-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='TRUSTED_HEADER_PUBLIC_KEY')].valueFrom.secretKeyRef.name}")
+		"mcp-gateway", "-o", "jsonpath={.spec.template.spec.containers[0].env[?(@.name=='TRUSTED_HEADER_PUBLIC_KEY')].valueFrom.secretKeyRef.name}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(output)) != ""
+}
+
+// IsAuthPolicyConfigured checks if AuthPolicy resources exist in the gateway namespace
+func IsAuthPolicyConfigured() bool {
+	cmd := exec.Command("kubectl", "get", "authpolicy", "-n", GatewayNamespace,
+		"-o", "jsonpath={.items[*].metadata.name}")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false

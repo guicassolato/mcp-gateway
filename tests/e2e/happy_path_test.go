@@ -318,18 +318,18 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		var sessionID string
 		Eventually(func(g Gomega) {
 			var initErr error
-			sessionID, initErr = mcpInitialize(gatewayURL)
+			sessionID, initErr = mcpInitialize(gatewayURL, nil)
 			g.Expect(initErr).NotTo(HaveOccurred())
 		}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 		GinkgoWriter.Println("client session ID:", sessionID)
 
-		Expect(mcpNotifyInitialized(gatewayURL, sessionID)).To(Succeed())
+		Expect(mcpNotifyInitialized(gatewayURL, sessionID, nil)).To(Succeed())
 
 		By("Calling headers tool to establish a backend session")
 		toolName := fmt.Sprintf("%s%s", registeredServer.Spec.ToolPrefix, "headers")
 		var backendSessionID string
 		Eventually(func(g Gomega) {
-			content, callErr := mcpCallTool(gatewayURL, sessionID, toolName)
+			_, content, callErr := mcpCallTool(gatewayURL, sessionID, toolName, nil, nil)
 			g.Expect(callErr).NotTo(HaveOccurred())
 			backendSessionID = extractBackendSession(content)
 			g.Expect(backendSessionID).NotTo(BeEmpty(), "expected backend Mcp-Session-Id in tool response")
@@ -342,7 +342,7 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		By("Calling headers tool with same session ID to verify Redis restored the backend session")
 		var restoredSessionID string
 		Eventually(func(g Gomega) {
-			content, callErr := mcpCallTool(gatewayURL, sessionID, toolName)
+			_, content, callErr := mcpCallTool(gatewayURL, sessionID, toolName, nil, nil)
 			g.Expect(callErr).NotTo(HaveOccurred())
 			restoredSessionID = extractBackendSession(content)
 			g.Expect(restoredSessionID).NotTo(BeEmpty(), "expected backend Mcp-Session-Id in tool response")

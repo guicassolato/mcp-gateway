@@ -22,7 +22,8 @@ keycloak-install-impl:
 	@echo ""
 	@echo "Requesting a certificate for Keycloak..."
 	@kubectl apply -f config/keycloak/certificate.yaml
-	@until kubectl get secret mcp-gateway-keycloak-cert -n gateway-system &>/dev/null; do echo "Waiting for secret..."; sleep 2; done
+	@for i in $$(seq 1 30); do kubectl get secret mcp-gateway-keycloak-cert -n gateway-system >/dev/null 2>&1 && break; echo "Waiting for TLS cert secret..."; sleep 2; done; \
+		kubectl get secret mcp-gateway-keycloak-cert -n gateway-system >/dev/null 2>&1 || { echo "ERROR: TLS cert secret not created after 60s"; exit 1; }
 	@echo ""
 	@echo "Reconfiguring the Kubernetes API server to trust the Keycloak server for authentication..."
 	@mkdir -p out/certs

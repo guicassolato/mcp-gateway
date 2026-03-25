@@ -27,6 +27,7 @@ import (
 type TestResourcesBuilder struct {
 	k8sClient        client.Client
 	testName         string
+	registrationName string
 	namespace        string
 	hostname         string
 	serviceName      string
@@ -130,6 +131,13 @@ func (b *TestResourcesBuilder) WithBackendNamespace(namespace string) *TestResou
 	return b
 }
 
+// WithRegistrationName overrides the auto-generated MCPServerRegistration name.
+// use when the name must match an external reference (e.g. Keycloak client IDs).
+func (b *TestResourcesBuilder) WithRegistrationName(name string) *TestResourcesBuilder {
+	b.registrationName = name
+	return b
+}
+
 // WithCredential sets the credential secret
 func (b *TestResourcesBuilder) WithCredential(secret *corev1.Secret, key string) *TestResourcesBuilder {
 	b.credential = secret
@@ -148,9 +156,13 @@ func (b *TestResourcesBuilder) Build() *TestResourcesBuilder {
 	}
 
 	// build MCPServerRegistration
+	regName := b.registrationName
+	if regName == "" {
+		regName = UniqueName("e2e-mcp-" + b.testName)
+	}
 	b.mcpServer = &mcpv1alpha1.MCPServerRegistration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      UniqueName("e2e-mcp-" + b.testName),
+			Name:      regName,
 			Namespace: b.namespace,
 			Labels:    map[string]string{"e2e": "test", "test": b.testName},
 		},
