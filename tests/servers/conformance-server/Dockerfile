@@ -15,7 +15,8 @@ WORKDIR /app
 # Upstream v0.1.15 uses createMcpExpressApp() which rejects non-localhost
 # Host headers, incompatible with in-cluster k8s service hostnames.
 COPY start.ts /tmp/start.ts
-RUN head -n 1055 everything-server.ts > temp.ts && \
+RUN SPLIT=$(grep -n '// ===== EXPRESS APP =====' everything-server.ts | cut -d: -f1) && \
+    head -n $((SPLIT - 1)) everything-server.ts > temp.ts && \
     cat /tmp/start.ts >> temp.ts && \
     mv temp.ts everything-server.ts
 
