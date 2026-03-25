@@ -38,7 +38,7 @@ func Initialize(ctx context.Context, gatewayHost, routerKey string, conf *config
 	}
 	caps := mcp.ClientCapabilities{}
 	if clientElicitation {
-		caps.Elicitation = &struct{}{}
+		caps.Elicitation = &mcp.ElicitationCapability{}
 	}
 	if _, err := httpClient.Initialize(ctx, mcp.InitializeRequest{
 		Params: mcp.InitializeParams{
