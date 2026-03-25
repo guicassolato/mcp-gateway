@@ -414,6 +414,8 @@ func (man *MCPManager) removeAllTools() {
 	}
 	man.serverTools = []server.ServerTool{}
 	man.tools = []mcp.Tool{}
+	man.toolsMap = map[string]mcp.Tool{}
+	man.servedToolsMap = map[string]mcp.Tool{}
 	man.gatewayServer.DeleteTools(toolsToRemove...)
 	man.logger.Debug("removed all tools", "upstream mcp server", man.MCP.ID(), "count", len(toolsToRemove))
 }
