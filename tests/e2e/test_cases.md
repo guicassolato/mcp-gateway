@@ -140,6 +140,10 @@
   - Only one ext_proc can handle a given port, so the oldest MCPGatewayExtension (by creation timestamp) wins
   - If the winning extension is deleted, the previously rejected extension should reconcile and become Ready
 
+### [Happy] Tool schema validation filters invalid tools
+
+- When a backend MCP server presents tools with invalid JSON schemas (e.g. `inputSchema.properties` with `"type": "int"` instead of `"integer"`), the gateway should filter out the invalid tools and not serve them to clients. The default `FilterOut` policy means the server is still registered and any valid tools are served, but invalid tools are excluded from `tools/list` responses. The `/status` endpoint should report the invalid tool count and details for the affected server. The custom-response-server is used for this test as it has a tool with `"type": "int"` in its input schema.
+
 ### [Happy] Elicitation accept flow
 
 - When a client connects to the gateway with an elicitation handler that accepts requests and provides user information, and calls a tool that triggers an elicitation request, the gateway should broker the elicitation between the upstream server and the client. The tool response should indicate that the user provided the requested information.
