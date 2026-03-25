@@ -396,3 +396,8 @@ Valkey
 mkdocs
 diataxis
 Failf
+Fatalf
+Unmarshal
+unmarshal
+omitempty
+Errorf

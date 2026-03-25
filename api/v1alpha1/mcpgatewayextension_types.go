@@ -15,6 +15,10 @@ type HTTPRouteManagementPolicy string
 // +kubebuilder:validation:Enum=Enabled;Disabled
 type KeyGenerationPolicy string
 
+// InvalidToolPolicy controls behavior when upstream MCP tools have invalid schemas
+// +kubebuilder:validation:Enum=FilterOut;RejectServer
+type InvalidToolPolicy string
+
 const (
 	// ConditionTypeReady signals if a resource is ready
 	ConditionTypeReady = "Ready"
@@ -40,6 +44,11 @@ const (
 	KeyGenerationEnabled KeyGenerationPolicy = "Enabled"
 	// KeyGenerationDisabled means the operator does not generate keys
 	KeyGenerationDisabled KeyGenerationPolicy = "Disabled"
+
+	// InvalidToolPolicyFilterOut skips invalid tools and serves valid ones
+	InvalidToolPolicyFilterOut InvalidToolPolicy = "FilterOut"
+	// InvalidToolPolicyRejectServer rejects all tools from a server if any are invalid
+	InvalidToolPolicyRejectServer InvalidToolPolicy = "RejectServer"
 )
 
 // MCPGatewayExtensionSpec defines the desired state of MCPGatewayExtension.
