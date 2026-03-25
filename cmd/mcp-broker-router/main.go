@@ -69,6 +69,7 @@ var (
 	loglevel                  int
 	logFormat                 string
 	enforceToolFilteringFlag  bool
+	invalidToolPolicyFlag     string
 )
 
 func main() {
@@ -134,6 +135,7 @@ func main() {
 	flag.Int64Var(&brokerWriteTimeoutSecs, "mcp-broker-write-timeout", 0, "HTTP write timeout in seconds for the broker. Default 0 (disabled) for SSE notification support. Set > 0 to enable timeout.")
 	flag.Int64Var(&managerTickerIntervalSecs, "mcp-check-interval", 60, "interval in seconds for MCP manager backend health checks. Default 60 seconds.")
 	flag.BoolVar(&enforceToolFilteringFlag, "enforce-tool-filtering", false, "when enabled an x-authorized-tools header will be needed to return any tools")
+	flag.StringVar(&invalidToolPolicyFlag, "invalid-tool-policy", "FilterOut", "policy for upstream tools with invalid schemas: FilterOut (default) or RejectServer")
 	flag.Parse()
 
 	loggerOpts := &slog.HandlerOptions{}
@@ -202,8 +204,22 @@ func main() {
 		panic("failed to setup elicitation map: " + err.Error())
 	}
 
+	invalidToolPolicy := mcpv1alpha1.InvalidToolPolicy(invalidToolPolicyFlag)
+	if invalidToolPolicy != mcpv1alpha1.InvalidToolPolicyFilterOut && invalidToolPolicy != mcpv1alpha1.InvalidToolPolicyRejectServer {
+		panic("--invalid-tool-policy must be FilterOut or RejectServer")
+	}
+
 	managerTickerInterval := time.Duration(managerTickerIntervalSecs) * time.Second
-	brokerServer, mcpBroker, mcpServer := setUpBroker(mcpBrokerAddrFlag, enforceToolFilteringFlag, jwtSessionMgr, brokerWriteTimeoutSecs, managerTickerInterval)
+	if managerTickerInterval <= 0 {
+		panic("flag mcp-check-interval cannot be 0 or less seconds")
+	}
+	mcpBroker := broker.NewBroker(logger.With("component", "broker"),
+		broker.WithEnforceToolFilter(enforceToolFilteringFlag),
+		broker.WithTrustedHeadersPublicKey(os.Getenv("TRUSTED_HEADER_PUBLIC_KEY")),
+		broker.WithManagerTickerInterval(managerTickerInterval),
+		broker.WithInvalidToolPolicy(invalidToolPolicy),
+	)
+	brokerServer, mcpServer := setUpHTTPServer(mcpBrokerAddrFlag, mcpBroker, jwtSessionMgr, brokerWriteTimeoutSecs)
 	routerGRPCServer, router := setUpRouter(mcpBroker, logger, jwtSessionMgr, sessionCache, elicitationMap)
 	mcpConfig.RegisterObserver(router)
 	mcpConfig.RegisterObserver(mcpBroker)
@@ -281,21 +297,18 @@ func main() {
 	}
 }
 
-func setUpBroker(address string, toolFiltering bool, sessionManager *session.JWTManager, writeTimeoutSecs int64, managerTickerInterval time.Duration) (*http.Server, broker.MCPBroker, *server.StreamableHTTPServer) {
-
+func setUpHTTPServer(address string, mcpBroker broker.MCPBroker, sessionManager *session.JWTManager, writeTimeoutSecs int64) (*http.Server, *server.StreamableHTTPServer) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprint(w, "Hello, World!  BTW, the MCP server is on /mcp")
 	})
 
-	// Add OAuth protected resource endpoint
 	oauthHandler := broker.ProtectedResourceHandler{Logger: logger}
 	mux.HandleFunc("/.well-known/oauth-protected-resource", oauthHandler.Handle)
 
 	// WriteTimeout of 0 (disabled) is important for SSE connections (GET /mcp).
 	// SSE streams notifications indefinitely - any write timeout would kill the connection.
-	// Connection lifecycle is managed by the application (client disconnect, session expiry, etc.)
 	writeTimeout := time.Duration(writeTimeoutSecs) * time.Second
 
 	httpSrv := &http.Server{
@@ -305,27 +318,14 @@ func setUpBroker(address string, toolFiltering bool, sessionManager *session.JWT
 		WriteTimeout: writeTimeout,
 	}
 
-	if managerTickerInterval <= 0 {
-		panic("flag mcp-check-interval cannot be 0 or less seconds")
-	}
-	mcpBroker := broker.NewBroker(logger.With("component", "broker"),
-		broker.WithEnforceToolFilter(toolFiltering),
-		broker.WithTrustedHeadersPublicKey(os.Getenv("TRUSTED_HEADER_PUBLIC_KEY")),
-		broker.WithManagerTickerInterval(managerTickerInterval),
-	)
-
-	var streamableHTTPServer = server.NewStreamableHTTPServer(
-		mcpBroker.MCPServer(),
+	streamableHTTPOpts := []server.StreamableHTTPOption{
 		server.WithStreamableHTTPServer(httpSrv),
-	)
+	}
 	if sessionManager != nil {
 		logger.Info("jwt session manager configured")
-		streamableHTTPServer = server.NewStreamableHTTPServer(
-			mcpBroker.MCPServer(),
-			server.WithStreamableHTTPServer(httpSrv),
-			server.WithSessionIdManager(sessionManager),
-		)
+		streamableHTTPOpts = append(streamableHTTPOpts, server.WithSessionIdManager(sessionManager))
 	}
+	streamableHTTPServer := server.NewStreamableHTTPServer(mcpBroker.MCPServer(), streamableHTTPOpts...)
 
 	// Allow direct connections with MCP Inspector
 	mux.HandleFunc("OPTIONS /mcp", func(w http.ResponseWriter, r *http.Request) {
@@ -337,7 +337,7 @@ func setUpBroker(address string, toolFiltering bool, sessionManager *session.JWT
 	mux.HandleFunc("/status/", mcpBroker.HandleStatusRequest)
 	mux.Handle("/mcp", streamableHTTPServer)
 
-	return httpSrv, mcpBroker, streamableHTTPServer
+	return httpSrv, streamableHTTPServer
 }
 
 func setUpRouter(broker broker.MCPBroker, logger *slog.Logger, jwtManager *session.JWTManager, sessionCache *session.Cache, elicitationMap idmap.Map) (*grpc.Server, *mcpRouter.ExtProcServer) {

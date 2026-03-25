@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/Kuadrant/mcp-gateway/internal/broker/upstream"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -33,7 +34,7 @@ func createTestManagerForStatus(t *testing.T, serverName string, tools []mcp.Too
 		ToolPrefix: "test_",
 		URL:        "http://test.local/mcp",
 	})
-	manager := upstream.NewUpstreamMCPManager(mcpServer, nil, slog.Default(), 0)
+	manager := upstream.NewUpstreamMCPManager(mcpServer, nil, slog.Default(), 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 	manager.SetToolsForTesting(tools)
 	manager.SetStatusForTesting(upstream.ServerValidationStatus{
 		Name:  serverName,
