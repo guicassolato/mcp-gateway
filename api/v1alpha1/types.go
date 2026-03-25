@@ -18,37 +18,46 @@ import (
 // MCPServerRegistration defines a collection of MCP (Model Context Protocol) servers to be aggregated by the gateway.
 // It enables discovery and federation of tools from multiple backend MCP servers through HTTPRoute references, providing a declarative way to configure which MCP servers should be accessible through the gateway.
 type MCPServerRegistration struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is a standard object metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MCPServerRegistrationSpec   `json:"spec,omitempty"`
+	// spec defines the desired state of MCPServerRegistration.
+	// +optional
+	Spec MCPServerRegistrationSpec `json:"spec,omitempty"`
+
+	// status defines the observed state of MCPServerRegistration.
+	// +optional
 	Status MCPServerRegistrationStatus `json:"status,omitempty"`
 }
 
 // MCPServerRegistrationSpec defines the desired state of MCPServerRegistration.
 // It specifies which HTTPRoutes point to MCP servers and how their tools should be federated.
 type MCPServerRegistrationSpec struct {
-	// TargetRef specifies an HTTPRoute that points to a backend MCP server.
+	// targetRef specifies an HTTPRoute that points to a backend MCP server.
 	// The referenced HTTPRoute should have a backend service that implements the MCP protocol.
 	// The controller will discover the backend service from this HTTPRoute and configure
 	// the broker to federate tools from that MCP server.
-	TargetRef TargetReference `json:"targetRef"`
+	// +required
+	TargetRef TargetReference `json:"targetRef,omitzero"`
 
-	// ToolPrefix is the prefix to add to all federated tools from referenced servers.
+	// toolPrefix is the prefix to add to all federated tools from referenced servers.
 	// This helps avoid naming conflicts when aggregating tools from multiple sources.
 	// For example, if two servers both provide a 'search' tool, prefixes like 'server1_' and 'server2_' ensure they can coexist as 'server1_search' and 'server2_search'.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="toolPrefix is immutable once set"
 	ToolPrefix string `json:"toolPrefix,omitempty"`
 
-	// Path specifies the URL path where the MCP server endpoint is exposed.
+	// path specifies the URL path where the MCP server endpoint is exposed.
 	// If not specified, defaults to "/mcp".
 	// This allows connecting to MCP servers that use custom paths like "/v1/mcp" or "/api/mcp".
 	// +optional
-	// +kubebuilder:default="/mcp"
+	// +default="/mcp"
 	Path string `json:"path,omitempty"`
 
-	// CredentialRef references a Secret containing authentication credentials for the MCP server.
+	// credentialRef references a Secret containing authentication credentials for the MCP server.
 	// The Secret should contain a key with the authentication token or credentials.
 	// The controller will aggregate these credentials and make them available to the broker via environment variables following the pattern: KAGENTI_{MCP_NAME}_CRED
 	// +optional
@@ -58,47 +67,57 @@ type MCPServerRegistrationSpec struct {
 // TargetReference identifies an HTTPRoute that points to MCP servers.
 // It follows Gateway API patterns for cross-resource references.
 type TargetReference struct {
-	// Group is the group of the target resource.
-	// +kubebuilder:default=gateway.networking.k8s.io
+	// group is the group of the target resource.
+	// +optional
+	// +default="gateway.networking.k8s.io"
 	// +kubebuilder:validation:Enum=gateway.networking.k8s.io
-	Group string `json:"group"`
+	Group string `json:"group,omitempty"`
 
-	// Kind is the kind of the target resource.
-	// +kubebuilder:default=HTTPRoute
+	// kind is the kind of the target resource.
+	// +optional
+	// +default="HTTPRoute"
 	// +kubebuilder:validation:Enum=HTTPRoute
-	Kind string `json:"kind"`
+	Kind string `json:"kind,omitempty"`
 
-	// Name is the name of the target resource.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	// name is the name of the target resource.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
 
-	// Namespace of the target resource (optional, defaults to same namespace)
+	// namespace of the target resource (optional, defaults to same namespace).
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
 // SecretReference identifies a Secret containing credentials for MCP server authentication.
 type SecretReference struct {
-	// Name is the name of the Secret resource.
-	Name string `json:"name"`
+	// name is the name of the Secret resource.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
 
-	// Key is the key within the Secret that contains the credential value.
+	// key is the key within the Secret that contains the credential value.
 	// If not specified, defaults to "token".
-	// +kubebuilder:default=token
 	// +optional
+	// +default="token"
 	Key string `json:"key,omitempty"`
 }
 
 // MCPServerRegistrationStatus represents the observed state of the MCPServerRegistration resource.
 // It contains conditions that indicate whether the referenced servers have been successfully discovered and are ready for use.
 type MCPServerRegistrationStatus struct {
-	// Conditions represent the latest available observations of the MCPServerRegistration's state.
+	// conditions represent the latest available observations of the MCPServerRegistration's state.
 	// Common conditions include 'Ready' to indicate if all referenced servers are accessible.
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// DiscoveredTools is the number of tools discovered from this MCPServerRegistration
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
 	// +optional
-	DiscoveredTools int `json:"discoveredTools,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// discoveredTools is the number of tools discovered from this MCPServerRegistration.
+	// +optional
+	DiscoveredTools int32 `json:"discoveredTools,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -119,23 +138,30 @@ type MCPServerRegistrationList struct {
 // It enables tool-level access control and federation by specifying which tools
 // should be accessible through this virtual endpoint.
 type MCPVirtualServer struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is a standard object metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// spec defines the desired state of MCPVirtualServer.
+	// +optional
 	Spec MCPVirtualServerSpec `json:"spec,omitempty"`
 }
 
 // MCPVirtualServerSpec defines the desired state of MCPVirtualServer.
 // It specifies which tools should be exposed by this virtual server.
 type MCPVirtualServerSpec struct {
-	// Description provides a human-readable description of this virtual server's purpose.
+	// description provides a human-readable description of this virtual server's purpose.
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// Tools specifies the list of tool names to expose through this virtual server.
+	// tools specifies the list of tool names to expose through this virtual server.
 	// These tools must be available from the underlying MCP servers configured in the system.
+	// +required
+	// +listType=atomic
 	// +kubebuilder:validation:MinItems=1
-	Tools []string `json:"tools"`
+	Tools []string `json:"tools,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -1,0 +1,29 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - kubeapilinter
+
+  settings:
+    custom:
+      kubeapilinter:
+        type: module
+        description: Kube API Linter lints Kube like APIs based on API conventions and best practices.
+        settings:
+          linters:
+            disable:
+              # making all optional fields pointers is a large refactor tracked separately
+              - optionalfields
+              # related to optionalfields, requires structural changes
+              - nonpointerstructs
+
+  exclusions:
+    rules:
+      - linters:
+          - kubeapilinter
+        path-except: api/
+      # ListenerConfig is an internal type not exposed via CRD
+      - linters:
+          - kubeapilinter
+        text: "ListenerConfig"

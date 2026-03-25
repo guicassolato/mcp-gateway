@@ -44,40 +44,41 @@ const (
 
 // MCPGatewayExtensionSpec defines the desired state of MCPGatewayExtension.
 type MCPGatewayExtensionSpec struct {
-	// TargetRef specifies the Gateway to extend with MCP protocol support.
+	// targetRef specifies the Gateway to extend with MCP protocol support.
 	// The controller will create an EnvoyFilter targeting this Gateway's Envoy proxy.
-	TargetRef MCPGatewayExtensionTargetReference `json:"targetRef"`
+	// +required
+	TargetRef MCPGatewayExtensionTargetReference `json:"targetRef,omitzero"`
 
-	// PublicHost overrides the public host derived from the listener hostname.
+	// publicHost overrides the public host derived from the listener hostname.
 	// Use when the listener has a wildcard and you need a specific host.
 	// +optional
 	PublicHost string `json:"publicHost,omitempty"`
 
-	// PrivateHost overrides the internal host used for hair-pinning requests
+	// privateHost overrides the internal host used for hair-pinning requests
 	// back through the gateway. Defaults to <gateway>-istio.<ns>.svc.cluster.local:<port>.
 	// +optional
 	PrivateHost string `json:"privateHost,omitempty"`
 
-	// BackendPingIntervalSeconds specifies how often the broker pings upstream MCP servers.
+	// backendPingIntervalSeconds specifies how often the broker pings upstream MCP servers.
 	// +optional
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=7200
-	// +kubebuilder:default=60
+	// +default=60
 	BackendPingIntervalSeconds *int32 `json:"backendPingIntervalSeconds,omitempty"`
 
-	// TrustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
+	// trustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
 	// When set, the public key secret is wired into the broker deployment.
 	// +optional
 	TrustedHeadersKey *TrustedHeadersKey `json:"trustedHeadersKey,omitempty"`
 
-	// HTTPRouteManagement controls whether the operator manages the gateway HTTPRoute.
+	// httpRouteManagement controls whether the operator manages the gateway HTTPRoute.
 	// Enabled: creates and manages the HTTPRoute (default).
 	// Disabled: does not create an HTTPRoute.
 	// +optional
-	// +kubebuilder:default=Enabled
+	// +default="Enabled"
 	HTTPRouteManagement HTTPRouteManagementPolicy `json:"httpRouteManagement,omitempty"`
 
-	// SessionStore references a secret for redis-based session storage.
+	// sessionStore references a secret for redis-based session storage.
 	// The secret must exist in the MCPGatewayExtension namespace and contain a CACHE_CONNECTION_STRING key.
 	// The value is injected as CACHE_CONNECTION_STRING into the broker-router deployment.
 	// When not set, in-memory session storage is used.
@@ -87,46 +88,48 @@ type MCPGatewayExtensionSpec struct {
 
 // SessionStore references a secret containing a redis connection string for session storage.
 type SessionStore struct {
-	// SecretName is the name of the secret containing the CACHE_CONNECTION_STRING key.
+	// secretName is the name of the secret containing the CACHE_CONNECTION_STRING key.
 	// The value should be a redis connection string: redis://<user>:<pass>@<host>:<port>/<db>
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	SecretName string `json:"secretName"`
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // TrustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
 // When configured, the public key is injected into the broker deployment via the
 // TRUSTED_HEADER_PUBLIC_KEY env var.
 type TrustedHeadersKey struct {
-	// SecretName is the name of the secret containing the public key used by the broker
+	// secretName is the name of the secret containing the public key used by the broker
 	// to verify trusted-header JWTs. The secret must have a data entry with key "key"
 	// containing the PEM-encoded public key.
 	// When Generate is Enabled, the operator creates this secret.
 	// When Generate is Disabled, this secret must already exist in the namespace.
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	SecretName string `json:"secretName"`
+	SecretName string `json:"secretName,omitempty"`
 
-	// Generate controls whether the operator generates an ECDSA P-256 key pair.
+	// generate controls whether the operator generates an ECDSA P-256 key pair.
 	// Enabled: creates <secretName> (public key) and <secretName>-private (private key)
 	// in the MCPGatewayExtension namespace with owner references.
 	// Disabled: the secret must already exist (default).
 	// Changing this field requires deleting the existing secrets first to ensure
 	// the public and private keys are a matching pair.
 	// +optional
-	// +kubebuilder:default=Disabled
+	// +default="Disabled"
 	Generate KeyGenerationPolicy `json:"generate,omitempty"`
 }
 
 // MCPGatewayExtensionStatus defines the observed state of MCPGatewayExtension.
 type MCPGatewayExtensionStatus struct {
-	// Conditions represent the current state of the MCPGatewayExtension.
+	// conditions represent the current state of the MCPGatewayExtension.
 	// The Ready condition indicates whether the broker-router deployment is running
 	// and the EnvoyFilter has been successfully applied to the target Gateway.
 	// +listType=map
 	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
 	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true
@@ -153,7 +156,7 @@ type MCPGatewayExtension struct {
 
 	// spec defines the desired state of MCPGatewayExtension
 	// +required
-	Spec MCPGatewayExtensionSpec `json:"spec"`
+	Spec MCPGatewayExtensionSpec `json:"spec,omitzero"`
 
 	// status defines the observed state of MCPGatewayExtension
 	// +optional
@@ -172,30 +175,35 @@ type MCPGatewayExtensionList struct {
 // MCPGatewayExtensionTargetReference identifies a Gateway listener to extend with MCP protocol support.
 // It follows Gateway API patterns for cross-resource references.
 type MCPGatewayExtensionTargetReference struct {
-	// Group is the group of the target resource.
-	// +kubebuilder:default=gateway.networking.k8s.io
+	// group is the group of the target resource.
+	// +optional
+	// +default="gateway.networking.k8s.io"
 	// +kubebuilder:validation:Enum=gateway.networking.k8s.io
-	Group string `json:"group"`
+	Group string `json:"group,omitempty"`
 
-	// Kind is the kind of the target resource.
-	// +kubebuilder:default=Gateway
+	// kind is the kind of the target resource.
+	// +optional
+	// +default="Gateway"
 	// +kubebuilder:validation:Enum=Gateway
-	Kind string `json:"kind"`
+	Kind string `json:"kind,omitempty"`
 
-	// Name is the name of the target resource.
-	Name string `json:"name"`
+	// name is the name of the target resource.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
 
-	// Namespace of the target resource (optional, defaults to same namespace)
+	// namespace of the target resource (optional, defaults to same namespace)
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// SectionName is the name of a listener on the target Gateway. The controller will
+	// sectionName is the name of a listener on the target Gateway. The controller will
 	// read the listener's port and hostname to configure the MCP Gateway instance.
 	// This allows multiple MCPGatewayExtensions to target different listeners on the
 	// same Gateway, each with their own MCP Gateway instance.
+	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
-	SectionName string `json:"sectionName"`
+	SectionName string `json:"sectionName,omitempty"`
 }
 
 func init() {
@@ -230,12 +238,13 @@ func (m *MCPGatewayExtension) HTTPRouteDisabled() bool {
 	return m.Spec.HTTPRouteManagement == HTTPRouteManagementDisabled
 }
 
-// ListenerConfig holds configuration extracted from a Gateway listener
+// ListenerConfig holds configuration extracted from a Gateway listener.
+// This is an internal type not exposed via CRD.
 type ListenerConfig struct {
-	// Port is the port number from the Gateway listener
-	Port uint32
-	// Hostname is the hostname from the Gateway listener (may be empty or a wildcard)
-	Hostname string
-	// Name is the listener name (sectionName)
-	Name string
+	// port is the port number from the Gateway listener
+	Port uint32 `json:"port,omitempty"`
+	// hostname is the hostname from the Gateway listener (may be empty or a wildcard)
+	Hostname string `json:"hostname,omitempty"`
+	// name is the listener name (sectionName)
+	Name string `json:"name,omitempty"`
 }

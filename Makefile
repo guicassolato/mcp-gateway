@@ -440,6 +440,16 @@ golangci-lint:
 		"$(MAKE)" golangci-lint-bin && bin/golangci-lint run ./...; \
 	fi
 
+KUBE_API_LINTER_VERSION ?= v0.0.0-20260320123815-c9b9b51b278a
+
+.PHONY: kube-api-linter
+kube-api-linter: bin/golangci-lint-kube-api-linter ## Run kube-api-linter on API types
+	bin/golangci-lint-kube-api-linter run --config .golangci-kube-api-linter.yml ./api/...
+
+bin/golangci-lint-kube-api-linter:
+	@echo "Installing kube-api-linter $(KUBE_API_LINTER_VERSION)..."
+	GOBIN=$(shell pwd)/bin go install sigs.k8s.io/kube-api-linter/cmd/golangci-lint-kube-api-linter@$(KUBE_API_LINTER_VERSION)
+
 # To install cspell, do `npm install -g cspell@latest`.
 # If this reports "Unknown word" for valid spellings, do
 # `cspell --words-only --config cspell.json --unique . | sort --ignore-case >> project-words.txt`
@@ -449,7 +459,7 @@ spell:
 	cspell --quiet --config cspell.json .
 
 .PHONY: lint
-lint: check-gofmt check-goimports check-newlines fmt vet golangci-lint spell ## Run all linting and style checks
+lint: check-gofmt check-goimports check-newlines fmt vet golangci-lint kube-api-linter spell ## Run all linting and style checks
 	@echo "All lint checks passed!"
 
 # Code style checks

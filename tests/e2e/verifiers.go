@@ -68,7 +68,7 @@ func (v *Verifier) MCPServerRegistrationReady(name, namespace string) error {
 }
 
 // MCPServerRegistrationReadyWithToolsCount checks Ready=True and expected tool count
-func (v *Verifier) MCPServerRegistrationReadyWithToolsCount(name, namespace string, expectedCount int) error {
+func (v *Verifier) MCPServerRegistrationReadyWithToolsCount(name, namespace string, expectedCount int32) error {
 	mcpServer, err := v.getMCPServerRegistration(name, namespace)
 	if err != nil {
 		return err
@@ -258,7 +258,7 @@ func VerifyMCPServerRegistrationReady(ctx context.Context, k8sClient client.Clie
 	return NewVerifier(ctx, k8sClient).MCPServerRegistrationReady(name, namespace)
 }
 
-func VerifyMCPServerRegistrationReadyWithToolsCount(ctx context.Context, k8sClient client.Client, name, namespace string, toolsCount int) error {
+func VerifyMCPServerRegistrationReadyWithToolsCount(ctx context.Context, k8sClient client.Client, name, namespace string, toolsCount int32) error {
 	return NewVerifier(ctx, k8sClient).MCPServerRegistrationReadyWithToolsCount(name, namespace, toolsCount)
 }
 
