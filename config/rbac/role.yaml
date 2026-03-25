@@ -7,14 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - endpoints
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - namespaces
   verbs:
   - get
@@ -29,7 +21,6 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -41,16 +32,7 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
-  - watch
-- apiGroups:
-  - discovery.k8s.io
-  resources:
-  - endpointslices
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - gateway.networking.k8s.io
@@ -64,10 +46,8 @@ rules:
   - gateway.networking.k8s.io
   resources:
   - gateways/status
-  - httproutes/status
   verbs:
   - get
-  - patch
   - update
 - apiGroups:
   - gateway.networking.k8s.io
@@ -78,9 +58,14 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
   - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes/status
+  verbs:
+  - update
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
@@ -95,11 +80,8 @@ rules:
   - mcpserverregistrations
   - mcpvirtualservers
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -117,7 +99,6 @@ rules:
   - mcpvirtualservers/status
   verbs:
   - get
-  - patch
   - update
 - apiGroups:
   - networking.istio.io
@@ -128,6 +109,5 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
   - watch

@@ -52,14 +52,6 @@ spec:
             - apiGroups:
                 - ""
               resources:
-                - endpoints
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
-                - ""
-              resources:
                 - namespaces
               verbs:
                 - get
@@ -74,7 +66,6 @@ spec:
                 - delete
                 - get
                 - list
-                - patch
                 - update
                 - watch
             - apiGroups:
@@ -86,16 +77,7 @@ spec:
                 - delete
                 - get
                 - list
-                - patch
                 - update
-                - watch
-            - apiGroups:
-                - discovery.k8s.io
-              resources:
-                - endpointslices
-              verbs:
-                - get
-                - list
                 - watch
             - apiGroups:
                 - gateway.networking.k8s.io
@@ -109,10 +91,8 @@ spec:
                 - gateway.networking.k8s.io
               resources:
                 - gateways/status
-                - httproutes/status
               verbs:
                 - get
-                - patch
                 - update
             - apiGroups:
                 - gateway.networking.k8s.io
@@ -123,9 +103,14 @@ spec:
                 - delete
                 - get
                 - list
-                - patch
                 - update
                 - watch
+            - apiGroups:
+                - gateway.networking.k8s.io
+              resources:
+                - httproutes/status
+              verbs:
+                - update
             - apiGroups:
                 - gateway.networking.k8s.io
               resources:
@@ -140,11 +125,8 @@ spec:
                 - mcpserverregistrations
                 - mcpvirtualservers
               verbs:
-                - create
-                - delete
                 - get
                 - list
-                - patch
                 - update
                 - watch
             - apiGroups:
@@ -162,7 +144,6 @@ spec:
                 - mcpvirtualservers/status
               verbs:
                 - get
-                - patch
                 - update
             - apiGroups:
                 - networking.istio.io
@@ -173,7 +154,6 @@ spec:
                 - delete
                 - get
                 - list
-                - patch
                 - update
                 - watch
           serviceAccountName: mcp-controller
