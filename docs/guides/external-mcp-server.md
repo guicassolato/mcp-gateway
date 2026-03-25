@@ -163,7 +163,7 @@ Create the `MCPServer` resource that registers the GitHub MCP server with the ga
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: github

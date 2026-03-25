@@ -73,7 +73,7 @@ The chart uses sensible defaults and requires minimal configuration. The configu
 After installation, create MCPServerRegistration resources to connect MCP servers:
 
 ```yaml
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: my-mcp-server
@@ -125,9 +125,9 @@ helm uninstall mcp-gateway
 
 # Note: CRDs are not automatically removed
 # Remove them manually if needed:
-kubectl delete crd mcpgatewayextensions.mcp.kagenti.com
-kubectl delete crd mcpserverregistrations.mcp.kagenti.com
-kubectl delete crd mcpvirtualservers.mcp.kagenti.com
+kubectl delete crd mcpgatewayextensions.mcp.kuadrant.io
+kubectl delete crd mcpserverregistrations.mcp.kuadrant.io
+kubectl delete crd mcpvirtualservers.mcp.kuadrant.io
 ```
 
 ## Development

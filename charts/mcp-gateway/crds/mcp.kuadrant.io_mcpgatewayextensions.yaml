@@ -4,42 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.0
-  name: mcpserverregistrations.mcp.kagenti.com
+  name: mcpgatewayextensions.mcp.kuadrant.io
 spec:
-  group: mcp.kagenti.com
+  group: mcp.kuadrant.io
   names:
-    kind: MCPServerRegistration
-    listKind: MCPServerRegistrationList
-    plural: mcpserverregistrations
-    shortNames:
-    - mcpsr
-    singular: mcpserverregistration
+    kind: MCPGatewayExtension
+    listKind: MCPGatewayExtensionList
+    plural: mcpgatewayextensions
+    singular: mcpgatewayextension
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Tool prefix for federation
-      jsonPath: .spec.toolPrefix
-      name: Prefix
-      type: string
-    - description: Target HTTPRoute.  MCP Gateway only supports routes with a single
-        BackendRef
-      jsonPath: .spec.targetRef.name
-      name: Target
-      type: string
-    - description: MCP endpoint path
-      jsonPath: .spec.path
-      name: Path
-      type: string
     - description: Ready status
       jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
-      type: string
-    - description: Number of discovered tools
-      jsonPath: .status.discoveredTools
-      name: Tools
-      type: integer
-    - jsonPath: .spec.credentialRef.name
-      name: Credentials
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -48,8 +26,16 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          MCPServerRegistration defines a collection of MCP (Model Context Protocol) servers to be aggregated by the gateway.
-          It enables discovery and federation of tools from multiple backend MCP servers through HTTPRoute references, providing a declarative way to configure which MCP servers should be accessible through the gateway.
+          MCPGatewayExtension extends a Gateway API Gateway to handle the Model Context Protocol (MCP).
+          When created, the controller will:
+          - Deploy a broker-router Deployment and Service in the MCPGatewayExtension's namespace
+          - Create an EnvoyFilter in the Gateway's namespace to route MCP traffic to the broker
+          - Configure the Envoy proxy to use the external processor for MCP request handling
+
+          The broker aggregates tools from upstream MCP servers registered via MCPServerRegistration
+          resources, while the router handles MCP protocol parsing and request routing.
+
+          Cross-namespace references to Gateways require a ReferenceGrant in the Gateway's namespace.
         properties:
           apiVersion:
             description: |-
@@ -69,40 +55,56 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of MCPServerRegistration.
+            description: spec defines the desired state of MCPGatewayExtension
             properties:
-              credentialRef:
+              backendPingIntervalSeconds:
+                default: 60
+                description: backendPingIntervalSeconds specifies how often the broker
+                  pings upstream MCP servers.
+                format: int32
+                maximum: 7200
+                minimum: 10
+                type: integer
+              httpRouteManagement:
+                default: Enabled
                 description: |-
-                  credentialRef references a Secret containing authentication credentials for the MCP server.
-                  The Secret should contain a key with the authentication token or credentials.
-                  The controller will aggregate these credentials and make them available to the broker via environment variables following the pattern: KAGENTI_{MCP_NAME}_CRED
+                  httpRouteManagement controls whether the operator manages the gateway HTTPRoute.
+                  Enabled: creates and manages the HTTPRoute (default).
+                  Disabled: does not create an HTTPRoute.
+                enum:
+                - Enabled
+                - Disabled
+                type: string
+              privateHost:
+                description: |-
+                  privateHost overrides the internal host used for hair-pinning requests
+                  back through the gateway. Defaults to <gateway>-istio.<ns>.svc.cluster.local:<port>.
+                type: string
+              publicHost:
+                description: |-
+                  publicHost overrides the public host derived from the listener hostname.
+                  Use when the listener has a wildcard and you need a specific host.
+                type: string
+              sessionStore:
+                description: |-
+                  sessionStore references a secret for redis-based session storage.
+                  The secret must exist in the MCPGatewayExtension namespace and contain a CACHE_CONNECTION_STRING key.
+                  The value is injected as CACHE_CONNECTION_STRING into the broker-router deployment.
+                  When not set, in-memory session storage is used.
                 properties:
-                  key:
-                    default: token
+                  secretName:
                     description: |-
-                      key is the key within the Secret that contains the credential value.
-                      If not specified, defaults to "token".
-                    type: string
-                  name:
-                    description: name is the name of the Secret resource.
+                      secretName is the name of the secret containing the CACHE_CONNECTION_STRING key.
+                      The value should be a redis connection string: redis://<user>:<pass>@<host>:<port>/<db>
                     minLength: 1
                     type: string
                 required:
-                - name
+                - secretName
                 type: object
-              path:
-                default: /mcp
-                description: |-
-                  path specifies the URL path where the MCP server endpoint is exposed.
-                  If not specified, defaults to "/mcp".
-                  This allows connecting to MCP servers that use custom paths like "/v1/mcp" or "/api/mcp".
-                type: string
               targetRef:
                 description: |-
-                  targetRef specifies an HTTPRoute that points to a backend MCP server.
-                  The referenced HTTPRoute should have a backend service that implements the MCP protocol.
-                  The controller will discover the backend service from this HTTPRoute and configure
-                  the broker to federate tools from that MCP server.
+                  targetRef specifies the Gateway to extend with MCP protocol support.
+                  The controller will create an EnvoyFilter targeting this Gateway's Envoy proxy.
                 properties:
                   group:
                     default: gateway.networking.k8s.io
@@ -111,10 +113,10 @@ spec:
                     - gateway.networking.k8s.io
                     type: string
                   kind:
-                    default: HTTPRoute
+                    default: Gateway
                     description: kind is the kind of the target resource.
                     enum:
-                    - HTTPRoute
+                    - Gateway
                     type: string
                   name:
                     description: name is the name of the target resource.
@@ -122,30 +124,62 @@ spec:
                     type: string
                   namespace:
                     description: namespace of the target resource (optional, defaults
-                      to same namespace).
+                      to same namespace)
+                    type: string
+                  sectionName:
+                    description: |-
+                      sectionName is the name of a listener on the target Gateway. The controller will
+                      read the listener's port and hostname to configure the MCP Gateway instance.
+                      This allows multiple MCPGatewayExtensions to target different listeners on the
+                      same Gateway, each with their own MCP Gateway instance.
+                    maxLength: 253
+                    minLength: 1
                     type: string
                 required:
                 - name
+                - sectionName
                 type: object
-              toolPrefix:
+              trustedHeadersKey:
                 description: |-
-                  toolPrefix is the prefix to add to all federated tools from referenced servers.
-                  This helps avoid naming conflicts when aggregating tools from multiple sources.
-                  For example, if two servers both provide a 'search' tool, prefixes like 'server1_' and 'server2_' ensure they can coexist as 'server1_search' and 'server2_search'.
-                type: string
-                x-kubernetes-validations:
-                - message: toolPrefix is immutable once set
-                  rule: self == oldSelf
+                  trustedHeadersKey configures trusted-header key pair for JWT-based tool filtering.
+                  When set, the public key secret is wired into the broker deployment.
+                properties:
+                  generate:
+                    default: Disabled
+                    description: |-
+                      generate controls whether the operator generates an ECDSA P-256 key pair.
+                      Enabled: creates <secretName> (public key) and <secretName>-private (private key)
+                      in the MCPGatewayExtension namespace with owner references.
+                      Disabled: the secret must already exist (default).
+                      Changing this field requires deleting the existing secrets first to ensure
+                      the public and private keys are a matching pair.
+                    enum:
+                    - Enabled
+                    - Disabled
+                    type: string
+                  secretName:
+                    description: |-
+                      secretName is the name of the secret containing the public key used by the broker
+                      to verify trusted-header JWTs. The secret must have a data entry with key "key"
+                      containing the PEM-encoded public key.
+                      When Generate is Enabled, the operator creates this secret.
+                      When Generate is Disabled, this secret must already exist in the namespace.
+                    minLength: 1
+                    type: string
+                required:
+                - secretName
+                type: object
             required:
             - targetRef
             type: object
           status:
-            description: status defines the observed state of MCPServerRegistration.
+            description: status defines the observed state of MCPGatewayExtension
             properties:
               conditions:
                 description: |-
-                  conditions represent the latest available observations of the MCPServerRegistration's state.
-                  Common conditions include 'Ready' to indicate if all referenced servers are accessible.
+                  conditions represent the current state of the MCPGatewayExtension.
+                  The Ready condition indicates whether the broker-router deployment is running
+                  and the EnvoyFilter has been successfully applied to the target Gateway.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -204,12 +238,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              discoveredTools:
-                description: discoveredTools is the number of tools discovered from
-                  this MCPServerRegistration.
-                format: int32
-                type: integer
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

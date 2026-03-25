@@ -1,11 +1,11 @@
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: conformance-server
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   # toolPrefix: conformance_ # conformance test suite expects no prefix
   targetRef:

@@ -25,7 +25,7 @@ First, create an MCPGatewayExtension in the same namespace as your MCP Gateway b
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPGatewayExtension
 metadata:
   name: mcp-extension
@@ -57,7 +57,7 @@ metadata:
   namespace: gateway-system  # Gateway's namespace
 spec:
   from:
-    - group: mcp.kagenti.com
+    - group: mcp.kuadrant.io
       kind: MCPGatewayExtension
       namespace: mcp-test  # MCPGatewayExtension's namespace
   to:
@@ -102,7 +102,7 @@ Create an `MCPServerRegistration` resource that references the HTTPRoute:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: my-mcp-server

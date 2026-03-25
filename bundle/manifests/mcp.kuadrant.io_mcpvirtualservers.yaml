@@ -4,9 +4,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.0
   creationTimestamp: null
-  name: mcpvirtualservers.mcp.kagenti.com
+  name: mcpvirtualservers.mcp.kuadrant.io
 spec:
-  group: mcp.kagenti.com
+  group: mcp.kuadrant.io
   names:
     kind: MCPVirtualServer
     listKind: MCPVirtualServerList

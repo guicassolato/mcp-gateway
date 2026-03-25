@@ -40,7 +40,7 @@ kubectl apply -k "https://github.com/kuadrant/mcp-gateway/config/crd?ref=v${MCP_
 Verify the CRDs are installed:
 
 ```bash
-kubectl get crd | grep mcp.kagenti.com
+kubectl get crd | grep mcp.kuadrant.io
 ```
 
 Note: CRDs are also installed automatically when deploying the controller via Helm in Step 3.
@@ -392,7 +392,7 @@ metadata:
   namespace: gateway-system
 spec:
   from:
-    - group: mcp.kagenti.com
+    - group: mcp.kuadrant.io
       kind: MCPGatewayExtension
       namespace: team-a
   to:
@@ -407,7 +407,7 @@ Create the MCPGatewayExtension to associate the team's namespace with a specific
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPGatewayExtension
 metadata:
   name: team-a-gateway

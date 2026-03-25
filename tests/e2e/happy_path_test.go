@@ -77,8 +77,8 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 
 		By("Verifying MCPServerRegistrations become ready")
 		Eventually(func(g Gomega) {
-			g.Expect(VerifyMCPServerRegistrationReadyWithToolsCount(ctx, k8sClient, registeredServer1.Name, registeredServer1.Namespace, 5)).To(BeNil())
-			g.Expect(VerifyMCPServerRegistrationReadyWithToolsCount(ctx, k8sClient, registeredServer2.Name, registeredServer2.Namespace, 5)).To(BeNil())
+			g.Expect(VerifyMCPServerRegistrationReadyWithToolsCount(ctx, k8sClient, registeredServer1.Name, registeredServer1.Namespace, 7)).To(BeNil())
+			g.Expect(VerifyMCPServerRegistrationReadyWithToolsCount(ctx, k8sClient, registeredServer2.Name, registeredServer2.Namespace, 7)).To(BeNil())
 		}, TestTimeoutLong, TestRetryInterval).To(Succeed())
 
 		By("Verifying HTTPRoute has Programmed condition set")

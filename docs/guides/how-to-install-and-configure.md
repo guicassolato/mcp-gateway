@@ -34,7 +34,7 @@ kubectl apply -k "https://github.com/kuadrant/mcp-gateway/config/crd?ref=v${MCP_
 Verify CRDs are installed:
 
 ```bash
-kubectl get crd | grep mcp.kagenti.com
+kubectl get crd | grep mcp.kuadrant.io
 ```
 
 Note: CRDs are also installed automatically when deploying via Helm.

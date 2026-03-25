@@ -104,8 +104,8 @@ done
 echo "MCP Gateway Controller installed via OLM"
 
 echo "Waiting for MCP Gateway CRDs to be established..."
-until oc wait crd/mcpgatewayextensions.mcp.kagenti.com --for condition=established &>/dev/null; do sleep 5; done
-until oc wait crd/mcpserverregistrations.mcp.kagenti.com --for condition=established &>/dev/null; do sleep 5; done
+until oc wait crd/mcpgatewayextensions.mcp.kuadrant.io --for condition=established &>/dev/null; do sleep 5; done
+until oc wait crd/mcpserverregistrations.mcp.kuadrant.io --for condition=established &>/dev/null; do sleep 5; done
 
 # Install MCP Gateway Instance (Gateway, ReferenceGrant, MCPGatewayExtension)
 echo "Installing MCP Gateway Instance..."

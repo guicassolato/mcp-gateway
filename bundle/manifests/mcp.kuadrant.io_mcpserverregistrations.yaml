@@ -1,12 +1,12 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.0
-  name: mcpserverregistrations.mcp.kagenti.com
+  creationTimestamp: null
+  name: mcpserverregistrations.mcp.kuadrant.io
 spec:
-  group: mcp.kagenti.com
+  group: mcp.kuadrant.io
   names:
     kind: MCPServerRegistration
     listKind: MCPServerRegistrationList
@@ -215,3 +215,9 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+  storedVersions: null

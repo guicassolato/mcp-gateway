@@ -208,7 +208,6 @@ jsonpointer
 jsonreference
 jsonschema
 jwtmgr
-kagenti
 keyout
 kgateway
 kisielk

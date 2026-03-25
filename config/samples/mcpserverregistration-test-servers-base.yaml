@@ -1,11 +1,11 @@
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: test-server1
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   # Tool prefix applied to all servers in this MCPServer
   toolPrefix: test1_
@@ -15,13 +15,13 @@ spec:
     kind: HTTPRoute
     name: mcp-server1-route
 ---
-apiVersion: mcp.kagenti.com/v1alpha1
+apiVersion: mcp.kuadrant.io/v1alpha1
 kind: MCPServerRegistration
 metadata:
   name: test-server2
   namespace: mcp-test
   labels:
-    'kagenti/mcp': 'true'
+    mcp.kuadrant.io/managed: 'true'
 spec:
   toolPrefix: test2_
   targetRef:

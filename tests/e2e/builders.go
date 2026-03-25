@@ -604,7 +604,7 @@ func (s *MCPGatewayExtensionSetup) Build() *MCPGatewayExtensionSetup {
 			Spec: gatewayv1beta1.ReferenceGrantSpec{
 				From: []gatewayv1beta1.ReferenceGrantFrom{
 					{
-						Group:     gatewayv1beta1.Group("mcp.kagenti.com"),
+						Group:     gatewayv1beta1.Group("mcp.kuadrant.io"),
 						Kind:      gatewayv1beta1.Kind("MCPGatewayExtension"),
 						Namespace: gatewayv1beta1.Namespace(s.namespace),
 					},
@@ -885,7 +885,7 @@ func NewReferenceGrantBuilder(name, namespace string) *ReferenceGrantBuilder {
 	return &ReferenceGrantBuilder{
 		name:      name,
 		namespace: namespace,
-		fromGroup: "mcp.kagenti.com",
+		fromGroup: "mcp.kuadrant.io",
 		fromKind:  "MCPGatewayExtension",
 		toGroup:   "gateway.networking.k8s.io",
 		toKind:    "Gateway",

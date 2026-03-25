@@ -154,7 +154,7 @@ generate-crds: generate ## Generate CRD manifests from Go types
 update-helm-crds: generate-crds ## Update Helm chart CRDs (run after generate-crds)
 	@echo "Copying CRDs to Helm chart..."
 	@mkdir -p charts/mcp-gateway/crds
-	cp config/crd/mcp.kagenti.com_*.yaml charts/mcp-gateway/crds/
+	cp config/crd/mcp.kuadrant.io_*.yaml charts/mcp-gateway/crds/
 	@echo "✅ Helm chart CRDs updated"
 
 # Generate all code, CRDs, and sync RBAC and CRDs to kustomize and helm chart
@@ -170,7 +170,7 @@ check-crd-sync: ## Check if CRDs are synchronized between config/crd and charts/
 	fi
 	@# Only compare actual CRD files, not kustomization.yaml
 	@SYNC_ERROR=0; \
-	for crd in config/crd/mcp.kagenti.com_*.yaml; do \
+	for crd in config/crd/mcp.kuadrant.io_*.yaml; do \
 		crd_name=$$(basename "$$crd"); \
 		if [ ! -f "charts/mcp-gateway/crds/$$crd_name" ]; then \
 			echo "❌ Missing CRD in Helm chart: $$crd_name"; \
@@ -199,9 +199,9 @@ check-bundle-crd-sync: bundle ## Check if bundle manifests are up to date
 
 # Install CRD
 install-crd: ## Install MCPServerRegistration and MCPVirtualServer CRDs
-	kubectl apply -f config/crd/mcp.kagenti.com_mcpserverregistrations.yaml
-	kubectl apply -f config/crd/mcp.kagenti.com_mcpvirtualservers.yaml
-	kubectl apply -f config/crd/mcp.kagenti.com_mcpgatewayextensions.yaml
+	kubectl apply -f config/crd/mcp.kuadrant.io_mcpserverregistrations.yaml
+	kubectl apply -f config/crd/mcp.kuadrant.io_mcpvirtualservers.yaml
+	kubectl apply -f config/crd/mcp.kuadrant.io_mcpgatewayextensions.yaml
 
 # Deploy mcp-gateway components (controller deploys broker-router via MCPGatewayExtension)
 deploy: install-crd deploy-namespaces deploy-controller ## Deploy controller to mcp-system namespace
@@ -293,7 +293,7 @@ deploy-example: install-crd ## Deploy example MCPServerRegistration resource
 build-test-servers: ## Build test server Docker images locally
 	@echo "Building test server images..."
 	cd tests/servers/server1 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server1:latest .
-	cd tests/servers/server2 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server2:latest .
+	$(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -f tests/servers/server2/Dockerfile -t ghcr.io/kuadrant/mcp-gateway/test-server2:latest .
 	cd tests/servers/server3 && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-server3:latest .
 	cd tests/servers/api-key-server && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-api-key-server:latest .
 	cd tests/servers/broken-server && $(CONTAINER_ENGINE) build $(CONTAINER_ENGINE_EXTRA_FLAGS) -t ghcr.io/kuadrant/mcp-gateway/test-broken-server:latest .
