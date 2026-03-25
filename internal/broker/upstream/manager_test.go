@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -104,8 +105,12 @@ func newMockMCP(name, prefix string) *MockMCP {
 		cfg:             &config.MCPServer{Name: name, ToolPrefix: prefix, URL: "http://mock/mcp"},
 		protocolVersion: mcp.LATEST_PROTOCOL_VERSION,
 		hasToolsCap:     true,
-		tools:           []mcp.Tool{{Name: "mock_tool"}},
+		tools:           []mcp.Tool{{Name: "mock_tool", InputSchema: mcp.ToolInputSchema{Type: "object"}}},
 	}
+}
+
+func validTool(name string) mcp.Tool {
+	return mcp.Tool{Name: name, InputSchema: mcp.ToolInputSchema{Type: "object"}}
 }
 
 // MockToolsAdderDeleter implements ToolsAdderDeleter for testing
@@ -168,7 +173,7 @@ func TestNewUpstreamMCPManager(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := newMockMCP(tc.name, "")
 			gateway := newMockToolsAdderDeleter()
-			manager := NewUpstreamMCPManager(mock, gateway, logger, tc.interval)
+			manager := NewUpstreamMCPManager(mock, gateway, logger, tc.interval, mcpv1alpha1.InvalidToolPolicyFilterOut)
 			assert.Equal(t, tc.expectedInterval, manager.tickerInterval)
 		})
 	}
@@ -177,7 +182,7 @@ func TestNewUpstreamMCPManager(t *testing.T) {
 func TestMCPManager_MCPName(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("my-test-server", "prefix_")
-	manager := NewUpstreamMCPManager(mock, nil, logger, 0)
+	manager := NewUpstreamMCPManager(mock, nil, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	assert.Equal(t, "my-test-server", manager.MCPName())
 }
@@ -185,7 +190,7 @@ func TestMCPManager_MCPName(t *testing.T) {
 func TestMCPManager_GetStatus(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test-server", "test_")
-	manager := NewUpstreamMCPManager(mock, nil, logger, 0)
+	manager := NewUpstreamMCPManager(mock, nil, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	expectedStatus := ServerValidationStatus{
 		ID:            "test-id",
@@ -208,11 +213,11 @@ func TestMCPManager_GetManagedTools(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test-server", "test_")
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	tools := []mcp.Tool{
-		{Name: "tool1", Description: "Tool 1"},
-		{Name: "tool2", Description: "Tool 2"},
+		{Name: "tool1", Description: "Tool 1", InputSchema: mcp.ToolInputSchema{Type: "object"}},
+		{Name: "tool2", Description: "Tool 2", InputSchema: mcp.ToolInputSchema{Type: "object"}},
 	}
 	manager.SetToolsForTesting(tools)
 
@@ -227,11 +232,9 @@ func TestMCPManager_GetManagedTools_ReturnsCopy(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test-server", "test_")
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
-	tools := []mcp.Tool{
-		{Name: "tool1"},
-	}
+	tools := []mcp.Tool{validTool("tool1")}
 	manager.SetToolsForTesting(tools)
 
 	// get tools and modify the returned slice
@@ -283,7 +286,7 @@ func TestMCPManager_GetServedManagedTool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := newMockMCP("test-server", tc.prefix)
 			gateway := newMockToolsAdderDeleter()
-			manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+			manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 			manager.SetToolsForTesting(tc.tools)
 
 			tool := manager.GetServedManagedTool(tc.lookupName)
@@ -329,10 +332,10 @@ func TestMCPManager_setStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := newMockMCP("test-server", "test_")
-			manager := NewUpstreamMCPManager(mock, nil, logger, 0)
+			manager := NewUpstreamMCPManager(mock, nil, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 			manager.serverTools = make([]server.ServerTool, tc.numServerTools)
 
-			manager.setStatus(tc.err, tc.totalTools)
+			manager.setStatus(tc.err, tc.totalTools, nil)
 
 			assert.Equal(t, string(mock.id), manager.status.ID)
 			assert.Equal(t, "test-server", manager.status.Name)
@@ -383,7 +386,7 @@ func TestPrefixedName(t *testing.T) {
 func TestMCPManager_toolToServerTool(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test-server", "prefix_")
-	manager := NewUpstreamMCPManager(mock, nil, logger, 0)
+	manager := NewUpstreamMCPManager(mock, nil, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	tool := mcp.Tool{
 		Name:        "mytool",
@@ -411,7 +414,7 @@ func TestMCPManager_Stop_Idempotent(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test", "")
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, time.Hour)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, time.Hour, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	// calling Stop multiple times should not panic
 	manager.Stop()
@@ -427,7 +430,7 @@ func TestMCPManager_manage_ConnectError(t *testing.T) {
 	mock := newMockMCP("test-server", "test_")
 	mock.connectErr = fmt.Errorf("connection refused")
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	manager.manage(context.Background(), eventTypeTimer)
 
@@ -441,7 +444,7 @@ func TestMCPManager_manage_PingError(t *testing.T) {
 	mock := newMockMCP("test-server", "test_")
 	mock.pingErr = fmt.Errorf("ping timeout")
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	manager.manage(context.Background(), eventTypeTimer)
 
@@ -456,7 +459,7 @@ func TestMCPManager_manage_ListToolsError(t *testing.T) {
 	mock.listToolsErr = fmt.Errorf("list tools failed")
 	mock.hasToolsCap = false // ensure we try to list tools
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	manager.manage(context.Background(), eventTypeTimer)
 
@@ -468,13 +471,10 @@ func TestMCPManager_manage_ListToolsError(t *testing.T) {
 func TestMCPManager_manage_Success(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	mock := newMockMCP("test-server", "test_")
-	mock.tools = []mcp.Tool{
-		{Name: "tool1"},
-		{Name: "tool2"},
-	}
+	mock.tools = []mcp.Tool{validTool("tool1"), validTool("tool2")}
 	mock.hasToolsCap = false // ensure we list tools every time
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	manager.manage(context.Background(), eventTypeTimer)
 
@@ -491,7 +491,7 @@ func TestMCPManager_manage_Success(t *testing.T) {
 func TestDiffTools(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	mock := newMockMCP("test-server", "test_")
-	manager := NewUpstreamMCPManager(mock, nil, logger, 0)
+	manager := NewUpstreamMCPManager(mock, nil, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	tests := []struct {
 		name            string
@@ -504,31 +504,31 @@ func TestDiffTools(t *testing.T) {
 	}{
 		{
 			name:            "no changes",
-			oldTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			newTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			oldTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			newTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedAdded:   0,
 			expectedRemoved: 0,
 		},
 		{
 			name:            "add new tool",
-			oldTools:        []mcp.Tool{{Name: "tool1"}},
-			newTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			oldTools:        []mcp.Tool{validTool("tool1")},
+			newTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedAdded:   1,
 			expectedRemoved: 0,
 			addedNames:      []string{"test_tool2"},
 		},
 		{
 			name:            "remove tool",
-			oldTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			newTools:        []mcp.Tool{{Name: "tool1"}},
+			oldTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			newTools:        []mcp.Tool{validTool("tool1")},
 			expectedAdded:   0,
 			expectedRemoved: 1,
 			removedNames:    []string{"test_tool2"},
 		},
 		{
 			name:            "add and remove tools",
-			oldTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			newTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool3"}},
+			oldTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			newTools:        []mcp.Tool{validTool("tool1"), validTool("tool3")},
 			expectedAdded:   1,
 			expectedRemoved: 1,
 			addedNames:      []string{"test_tool3"},
@@ -537,13 +537,13 @@ func TestDiffTools(t *testing.T) {
 		{
 			name:            "empty old tools",
 			oldTools:        []mcp.Tool{},
-			newTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			newTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedAdded:   2,
 			expectedRemoved: 0,
 		},
 		{
 			name:            "empty new tools",
-			oldTools:        []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			oldTools:        []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			newTools:        []mcp.Tool{},
 			expectedAdded:   0,
 			expectedRemoved: 2,
@@ -672,7 +672,7 @@ func TestMCPManager_shouldFetchTools(t *testing.T) {
 			mock := newMockMCP("test-server", "test_")
 			mock.hasToolsCap = tt.supportsToolsListChange
 			gateway := newMockToolsAdderDeleter()
-			manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+			manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 			if tt.hasExistingTools {
 				// set serverTools directly since shouldFetchTools checks this field
@@ -688,10 +688,10 @@ func TestMCPManager_shouldFetchTools(t *testing.T) {
 func TestMCPManager_manage_SkipsFetchOnTimerWhenToolsListChangeSupported(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	mock := newMockMCP("test-server", "test_")
-	mock.tools = []mcp.Tool{{Name: "tool1"}}
+	mock.tools = []mcp.Tool{validTool("tool1")}
 	mock.hasToolsCap = true // supports tools list change notifications
 	gateway := newMockToolsAdderDeleter()
-	manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 	// First call with notification - should fetch and add tools
 	manager.manage(context.Background(), eventTypeNotification)
@@ -699,7 +699,7 @@ func TestMCPManager_manage_SkipsFetchOnTimerWhenToolsListChangeSupported(t *test
 	assert.Len(t, gateway.tools, 1)
 
 	// Update mock tools - simulating a change on the server
-	mock.tools = []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}}
+	mock.tools = []mcp.Tool{validTool("tool1"), validTool("tool2")}
 
 	// Timer event - should skip fetching since we support notifications and have tools
 	manager.manage(context.Background(), eventTypeTimer)
@@ -724,42 +724,42 @@ func TestMCPManager_manage_OnlyCallsAddDeleteWhenNeeded(t *testing.T) {
 	}{
 		{
 			name:             "no changes - neither AddTools nor DeleteTools called",
-			initialTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			updatedTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			initialTools:     []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			updatedTools:     []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedAddCalls: 1, // only initial add
 			expectedDelCalls: 0,
 		},
 		{
 			name:             "only adding tools - only AddTools called",
-			initialTools:     []mcp.Tool{{Name: "tool1"}},
-			updatedTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			initialTools:     []mcp.Tool{validTool("tool1")},
+			updatedTools:     []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedAddCalls: 2, // initial + update
 			expectedDelCalls: 0,
 		},
 		{
 			name:             "only removing tools - only DeleteTools called",
-			initialTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			updatedTools:     []mcp.Tool{{Name: "tool1"}},
+			initialTools:     []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			updatedTools:     []mcp.Tool{validTool("tool1")},
 			expectedAddCalls: 1, // only initial
 			expectedDelCalls: 1,
 		},
 		{
 			name:             "adding and removing - both called",
-			initialTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			updatedTools:     []mcp.Tool{{Name: "tool1"}, {Name: "tool3"}},
+			initialTools:     []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			updatedTools:     []mcp.Tool{validTool("tool1"), validTool("tool3")},
 			expectedAddCalls: 2, // initial + update
 			expectedDelCalls: 1,
 		},
 		{
 			name:             "empty to tools - only AddTools called",
 			initialTools:     []mcp.Tool{},
-			updatedTools:     []mcp.Tool{{Name: "tool1"}},
+			updatedTools:     []mcp.Tool{validTool("tool1")},
 			expectedAddCalls: 1, // only update (initial has nothing to add)
 			expectedDelCalls: 0,
 		},
 		{
 			name:             "tools to empty - only DeleteTools called",
-			initialTools:     []mcp.Tool{{Name: "tool1"}},
+			initialTools:     []mcp.Tool{validTool("tool1")},
 			updatedTools:     []mcp.Tool{},
 			expectedAddCalls: 1, // only initial
 			expectedDelCalls: 1,
@@ -772,7 +772,7 @@ func TestMCPManager_manage_OnlyCallsAddDeleteWhenNeeded(t *testing.T) {
 			mock := newMockMCP("test-server", "test_")
 			mock.hasToolsCap = false // ensure we fetch tools on every manage call
 			gateway := newMockToolsAdderDeleter()
-			manager := NewUpstreamMCPManager(mock, gateway, logger, 0)
+			manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 			// first manage call - establish initial tools
 			mock.tools = tt.initialTools
@@ -805,46 +805,46 @@ func TestServerToolsManagement(t *testing.T) {
 			name:                 "add tools to empty",
 			prefix:               "test_",
 			initialTools:         []mcp.Tool{},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			updatedTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedServerTools:  []string{"test_tool1", "test_tool2"},
 			expectedGatewayTools: []string{"test_tool1", "test_tool2"},
 		},
 		{
 			name:                 "remove single tool",
 			prefix:               "test_",
-			initialTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}, {Name: "tool3"}},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool3"}},
+			initialTools:         []mcp.Tool{validTool("tool1"), validTool("tool2"), validTool("tool3")},
+			updatedTools:         []mcp.Tool{validTool("tool1"), validTool("tool3")},
 			expectedServerTools:  []string{"test_tool1", "test_tool3"},
 			expectedGatewayTools: []string{"test_tool1", "test_tool3"},
 		},
 		{
 			name:                 "remove multiple tools",
 			prefix:               "test_",
-			initialTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}, {Name: "tool3"}},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}},
+			initialTools:         []mcp.Tool{validTool("tool1"), validTool("tool2"), validTool("tool3")},
+			updatedTools:         []mcp.Tool{validTool("tool1")},
 			expectedServerTools:  []string{"test_tool1"},
 			expectedGatewayTools: []string{"test_tool1"},
 		},
 		{
 			name:                 "add and remove tools simultaneously",
 			prefix:               "test_",
-			initialTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool3"}, {Name: "tool4"}},
+			initialTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			updatedTools:         []mcp.Tool{validTool("tool1"), validTool("tool3"), validTool("tool4")},
 			expectedServerTools:  []string{"test_tool1", "test_tool3", "test_tool4"},
 			expectedGatewayTools: []string{"test_tool1", "test_tool3", "test_tool4"},
 		},
 		{
 			name:                 "no changes keeps existing tools",
 			prefix:               "test_",
-			initialTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			initialTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
+			updatedTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedServerTools:  []string{"test_tool1", "test_tool2"},
 			expectedGatewayTools: []string{"test_tool1", "test_tool2"},
 		},
 		{
 			name:                 "remove all tools",
 			prefix:               "test_",
-			initialTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			initialTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			updatedTools:         []mcp.Tool{},
 			expectedServerTools:  []string{},
 			expectedGatewayTools: []string{},
@@ -852,8 +852,8 @@ func TestServerToolsManagement(t *testing.T) {
 		{
 			name:                 "works without prefix",
 			prefix:               "",
-			initialTools:         []mcp.Tool{{Name: "tool1"}},
-			updatedTools:         []mcp.Tool{{Name: "tool1"}, {Name: "tool2"}},
+			initialTools:         []mcp.Tool{validTool("tool1")},
+			updatedTools:         []mcp.Tool{validTool("tool1"), validTool("tool2")},
 			expectedServerTools:  []string{"tool1", "tool2"},
 			expectedGatewayTools: []string{"tool1", "tool2"},
 		},
@@ -865,7 +865,7 @@ func TestServerToolsManagement(t *testing.T) {
 			mockMCP := newMockMCP("test-server", tt.prefix)
 			mockMCP.hasToolsCap = false // ensure we fetch tools on every manage call
 			mockGateway := NewMockGatewayServer()
-			manager := NewUpstreamMCPManager(mockMCP, mockGateway, logger, 0)
+			manager := NewUpstreamMCPManager(mockMCP, mockGateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
 
 			// First manage call - establish initial tools
 			mockMCP.tools = tt.initialTools
@@ -904,4 +904,85 @@ func TestServerToolsManagement(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMCPManager_manage_FilterOutPolicy(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	mock := newMockMCP("test-server", "test_")
+	mock.tools = []mcp.Tool{
+		validTool("good_tool"),
+		{Name: "bad_tool", InputSchema: mcp.ToolInputSchema{Type: "int"}},
+	}
+	mock.hasToolsCap = false
+	gateway := newMockToolsAdderDeleter()
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
+
+	manager.manage(context.Background(), eventTypeTimer)
+
+	status := manager.GetStatus()
+	assert.True(t, status.Ready)
+	assert.Equal(t, 1, status.TotalTools)
+	assert.Equal(t, 1, status.InvalidTools)
+	assert.Len(t, status.InvalidToolList, 1)
+	assert.Equal(t, "bad_tool", status.InvalidToolList[0].Name)
+	assert.Len(t, gateway.tools, 1)
+	assert.Contains(t, gateway.tools, "test_good_tool")
+}
+
+func TestMCPManager_manage_FilterOutPolicy_AllInvalid(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	mock := newMockMCP("test-server", "test_")
+	mock.tools = []mcp.Tool{
+		{Name: "bad1", InputSchema: mcp.ToolInputSchema{Type: "int"}},
+		{Name: "bad2", InputSchema: mcp.ToolInputSchema{Type: "string"}},
+	}
+	mock.hasToolsCap = false
+	gateway := newMockToolsAdderDeleter()
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
+
+	manager.manage(context.Background(), eventTypeTimer)
+
+	status := manager.GetStatus()
+	assert.True(t, status.Ready)
+	assert.Equal(t, 0, status.TotalTools)
+	assert.Equal(t, 2, status.InvalidTools)
+	assert.Empty(t, gateway.tools)
+}
+
+func TestMCPManager_manage_RejectServerPolicy(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	mock := newMockMCP("test-server", "test_")
+	mock.tools = []mcp.Tool{
+		validTool("good_tool"),
+		{Name: "bad_tool", InputSchema: mcp.ToolInputSchema{Type: "int"}},
+	}
+	mock.hasToolsCap = false
+	gateway := newMockToolsAdderDeleter()
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyRejectServer)
+
+	manager.manage(context.Background(), eventTypeTimer)
+
+	status := manager.GetStatus()
+	assert.False(t, status.Ready)
+	assert.Contains(t, status.Message, "rejected")
+	assert.Equal(t, 1, status.InvalidTools)
+	assert.Empty(t, gateway.tools)
+}
+
+func TestMCPManager_manage_AllValidTools(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	mock := newMockMCP("test-server", "test_")
+	mock.tools = []mcp.Tool{validTool("tool1"), validTool("tool2")}
+	mock.hasToolsCap = false
+	gateway := newMockToolsAdderDeleter()
+	manager := NewUpstreamMCPManager(mock, gateway, logger, 0, mcpv1alpha1.InvalidToolPolicyFilterOut)
+
+	manager.manage(context.Background(), eventTypeTimer)
+
+	status := manager.GetStatus()
+	assert.True(t, status.Ready)
+	assert.Equal(t, 2, status.TotalTools)
+	assert.Equal(t, 0, status.InvalidTools)
+	assert.Empty(t, status.InvalidToolList)
+	assert.Len(t, gateway.tools, 2)
 }

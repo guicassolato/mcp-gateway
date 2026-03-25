@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/Kuadrant/mcp-gateway/internal/broker/upstream"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -71,34 +72,47 @@ type mcpBrokerImpl struct {
 
 	// managerTickerInterval is the interval for MCP manager backend health checks
 	managerTickerInterval time.Duration
+
+	// invalidToolPolicy controls behavior when upstream tools have invalid schemas
+	invalidToolPolicy mcpv1alpha1.InvalidToolPolicy
 }
 
 // this ensures that mcpBrokerImpl implements the MCPBroker interface
 var _ MCPBroker = &mcpBrokerImpl{}
 
+// Option configures a broker instance
+type Option func(mb *mcpBrokerImpl)
+
 // WithEnforceToolFilter defines enforceToolFilter setting and is intended for use with the NewBroker function
-func WithEnforceToolFilter(enforce bool) func(mb *mcpBrokerImpl) {
+func WithEnforceToolFilter(enforce bool) Option {
 	return func(mb *mcpBrokerImpl) {
 		mb.enforceToolFilter = enforce
 	}
 }
 
 // WithTrustedHeadersPublicKey defines the public key used to verify signed headers and is intended for use with the NewBroker function
-func WithTrustedHeadersPublicKey(key string) func(mb *mcpBrokerImpl) {
+func WithTrustedHeadersPublicKey(key string) Option {
 	return func(mb *mcpBrokerImpl) {
 		mb.trustedHeadersPublicKey = key
 	}
 }
 
 // WithManagerTickerInterval sets the interval for MCP manager backend health checks
-func WithManagerTickerInterval(interval time.Duration) func(mb *mcpBrokerImpl) {
+func WithManagerTickerInterval(interval time.Duration) Option {
 	return func(mb *mcpBrokerImpl) {
 		mb.managerTickerInterval = interval
 	}
 }
 
+// WithInvalidToolPolicy sets the policy for handling upstream tools with invalid schemas
+func WithInvalidToolPolicy(policy mcpv1alpha1.InvalidToolPolicy) Option {
+	return func(mb *mcpBrokerImpl) {
+		mb.invalidToolPolicy = policy
+	}
+}
+
 // NewBroker creates a new MCPBroker accepts optional config functions such as WithEnforceToolFilter
-func NewBroker(logger *slog.Logger, opts ...func(*mcpBrokerImpl)) MCPBroker {
+func NewBroker(logger *slog.Logger, opts ...Option) MCPBroker {
 	mcpBkr := &mcpBrokerImpl{
 		mcpServers:            map[config.UpstreamMCPID]*upstream.MCPManager{},
 		logger:                logger,
@@ -179,7 +193,7 @@ func (m *mcpBrokerImpl) OnConfigChange(ctx context.Context, conf *config.MCPServ
 		// check if we need to setup a new manager
 		if _, ok := m.mcpServers[mcpServer.ID()]; !ok {
 			m.logger.Info("starting new manager", "server id", mcpServer.ID())
-			manager := upstream.NewUpstreamMCPManager(upstream.NewUpstreamMCP(mcpServer), m.listeningMCPServer, m.logger.With("sub-component", "mcp-manager"), m.managerTickerInterval)
+			manager := upstream.NewUpstreamMCPManager(upstream.NewUpstreamMCP(mcpServer), m.listeningMCPServer, m.logger.With("sub-component", "mcp-manager"), m.managerTickerInterval, m.invalidToolPolicy)
 			m.mcpServers[mcpServer.ID()] = manager
 			go func() {
 				m.logger.Info("Starting manager for", "mcpID", mcpServer.ID())

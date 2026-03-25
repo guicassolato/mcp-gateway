@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	mcpv1alpha1 "github.com/Kuadrant/mcp-gateway/api/v1alpha1"
 	"github.com/Kuadrant/mcp-gateway/internal/config"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -43,12 +44,14 @@ const (
 
 // ServerValidationStatus contains the validation results for an upstream MCP server
 type ServerValidationStatus struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	LastValidated time.Time `json:"lastValidated"`
-	Message       string    `json:"message"`
-	Ready         bool      `json:"ready"`
-	TotalTools    int       `json:"totalTools"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	LastValidated   time.Time         `json:"lastValidated"`
+	Message         string            `json:"message"`
+	Ready           bool              `json:"ready"`
+	TotalTools      int               `json:"totalTools"`
+	InvalidTools    int               `json:"invalidTools"`
+	InvalidToolList []InvalidToolInfo `json:"invalidToolList,omitempty"`
 }
 
 // MCP defines the interface for the manager to interact with an MCP server
@@ -87,6 +90,9 @@ type MCPManager struct {
 
 	logger *slog.Logger
 
+	// invalidToolPolicy controls behavior when upstream tools have invalid schemas
+	invalidToolPolicy mcpv1alpha1.InvalidToolPolicy
+
 	stopOnce sync.Once     // ensures Stop() is only executed once
 	done     chan struct{} // triggers the exit of the select and routine
 	status   ServerValidationStatus
@@ -98,21 +104,22 @@ const DefaultTickerInterval = time.Minute * 1
 // NewUpstreamMCPManager creates a new MCPManager for managing a single upstream MCP server.
 // The addTools and removeTools callbacks are used to update the gateway's tool registry.
 // The tickerInterval controls how often the manager checks backend health (use 0 for default).
-func NewUpstreamMCPManager(upstream MCP, gatewaySever ToolsAdderDeleter, logger *slog.Logger, tickerInterval time.Duration) *MCPManager {
+func NewUpstreamMCPManager(upstream MCP, gatewaySever ToolsAdderDeleter, logger *slog.Logger, tickerInterval time.Duration, policy mcpv1alpha1.InvalidToolPolicy) *MCPManager {
 	if tickerInterval <= 0 {
 		tickerInterval = DefaultTickerInterval
 	}
 
 	return &MCPManager{
-		MCP:            upstream,
-		gatewayServer:  gatewaySever,
-		tickerInterval: tickerInterval,
-		ticker:         time.NewTicker(tickerInterval),
-		logger:         logger,
-		done:           make(chan struct{}),
-		toolsMap:       map[string]mcp.Tool{},
-		servedToolsMap: map[string]mcp.Tool{},
-		serverTools:    []server.ServerTool{},
+		MCP:               upstream,
+		gatewayServer:     gatewaySever,
+		tickerInterval:    tickerInterval,
+		ticker:            time.NewTicker(tickerInterval),
+		logger:            logger,
+		invalidToolPolicy: policy,
+		done:              make(chan struct{}),
+		toolsMap:          map[string]mcp.Tool{},
+		servedToolsMap:    map[string]mcp.Tool{},
+		serverTools:       []server.ServerTool{},
 	}
 }
 
@@ -187,7 +194,7 @@ func (man *MCPManager) manage(ctx context.Context, event eventType) {
 		man.removeAllTools()
 		// we call disconnect here as we may have connected but failed to initialize
 		_ = man.MCP.Disconnect()
-		man.setStatus(err, numberOfTools)
+		man.setStatus(err, numberOfTools, nil)
 		return
 	}
 	// there may be an active client so we also ping
@@ -197,7 +204,7 @@ func (man *MCPManager) manage(ctx context.Context, event eventType) {
 		man.logger.Error("ping failed", "upstream mcp server", man.MCP.ID(), "error", err)
 		man.removeAllTools()
 		_ = man.MCP.Disconnect()
-		man.setStatus(err, numberOfTools)
+		man.setStatus(err, numberOfTools, nil)
 		return
 	}
 
@@ -211,15 +218,33 @@ func (man *MCPManager) manage(ctx context.Context, event eventType) {
 	if err != nil {
 		err = fmt.Errorf("upstream mcp failed to list tools server %s : %w", man.MCP.ID(), err)
 		man.logger.Error("failed to list tools", "upstream mcp server", man.MCP.ID(), "error", err)
-		man.setStatus(err, numberOfTools)
+		man.setStatus(err, numberOfTools, nil)
 		return
 	}
+
+	// validate fetched tools
+	validTools, invalidTools := ValidateTools(fetched)
+	if len(invalidTools) > 0 {
+		man.logger.Error("invalid tools detected", "upstream mcp server", man.MCP.ID(), "invalid", len(invalidTools), "valid", len(validTools))
+		for _, info := range invalidTools {
+			man.logger.Error("invalid tool", "upstream mcp server", man.MCP.ID(), "tool", info.Name, "errors", info.Errors)
+		}
+		if man.invalidToolPolicy == mcpv1alpha1.InvalidToolPolicyRejectServer {
+			err = fmt.Errorf("upstream mcp %s rejected: %d invalid tools found", man.MCP.ID(), len(invalidTools))
+			man.removeAllTools()
+			man.setStatus(err, numberOfTools, invalidTools)
+			return
+		}
+		// FilterOut: use only valid tools
+		fetched = validTools
+	}
+
 	// always compare the tools without prefix
 	toAdd, toRemove := man.diffTools(current, fetched)
 	if err := man.findToolConflicts(toAdd); err != nil {
 		err = fmt.Errorf("upstream mcp failed to add tools to gateway %s : %w", man.MCP.ID(), err)
 		man.logger.Error("tool conflict detected", "upstream mcp server", man.MCP.ID(), "error", err)
-		man.setStatus(err, numberOfTools)
+		man.setStatus(err, numberOfTools, invalidTools)
 		return
 	}
 	man.toolsLock.Lock()
@@ -251,7 +276,7 @@ func (man *MCPManager) manage(ctx context.Context, event eventType) {
 	man.serverTools = append(man.serverTools, toAdd...)
 	man.logger.Debug("internal tools", "upstream mcp server", man.MCP.ID(), "total", len(man.serverTools))
 	man.toolsLock.Unlock()
-	man.setStatus(nil, numberOfTools)
+	man.setStatus(nil, numberOfTools, invalidTools)
 }
 
 func (man *MCPManager) shouldFetchTools(event eventType) bool {
@@ -273,10 +298,12 @@ func (man *MCPManager) GetStatus() ServerValidationStatus {
 	return man.status
 }
 
-func (man *MCPManager) setStatus(err error, toolCount int) {
+func (man *MCPManager) setStatus(err error, toolCount int, invalidTools []InvalidToolInfo) {
 	man.status.ID = string(man.MCP.ID())
 	man.status.LastValidated = time.Now()
 	man.status.Name = man.MCPName()
+	man.status.InvalidTools = len(invalidTools)
+	man.status.InvalidToolList = invalidTools
 	if err != nil {
 		man.status.Message = err.Error()
 		man.status.Ready = false
