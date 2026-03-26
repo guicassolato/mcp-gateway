@@ -103,9 +103,9 @@ done
 
 kubectl apply -f "${RAW}/config/samples/mcpserverregistration-test-servers-base.yaml"
 
-echo "Waiting for test servers..."
-kubectl wait --for=condition=available --timeout=180s deployment/mcp-test-server1 -n mcp-test
-kubectl wait --for=condition=available --timeout=180s deployment/mcp-test-server2 -n mcp-test
+echo "Waiting for test server images to be pulled and pods to start (this may take a few minutes)..."
+kubectl wait --for=condition=available --timeout=300s deployment/mcp-test-server1 -n mcp-test
+kubectl wait --for=condition=available --timeout=300s deployment/mcp-test-server2 -n mcp-test
 
 echo ""
 echo "Verifying setup..."
