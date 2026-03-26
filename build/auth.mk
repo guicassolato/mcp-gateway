@@ -30,9 +30,8 @@ auth-example-setup: cert-manager-install kuadrant-install keycloak-install ## Se
 	@echo ""
 	@echo "Step 3/5: Applying AuthPolicy configurations..."
 	@kubectl apply -k ./config/samples/oauth-token-exchange/
-	@kubectl get deployment/mcp-gateway -n mcp-system -o yaml | \
-		bin/yq '.spec.template.spec.containers[0].env += [{"name":"TRUSTED_HEADER_PUBLIC_KEY","valueFrom":{"secretKeyRef":{"name":"trusted-headers-public-key","key":"key"}}}] | .spec.template.spec.containers[0].env |= unique_by(.name)' | \
-		kubectl apply -f -
+	@kubectl patch mcpgatewayextension mcp-gateway-extension -n mcp-system --type='merge' \
+		-p='{"spec":{"trustedHeadersKey":{"secretName":"trusted-headers-public-key"}}}'
 	@echo "✅ AuthPolicy configurations applied"
 	@echo ""
 	@echo "Step 4/5: Configuring CORS rules for the OpenID Connect Client Registration endpoint..."

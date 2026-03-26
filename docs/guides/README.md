@@ -17,4 +17,5 @@
 - [Scaling](./scaling.md)
 - [Tool Revocation](./tool-revocation.md)
 - [Vault Integration](./vault-integration.md)
+- [Vault Token Exchange](./vault-token-exchange.md)
 - [Troubleshooting](./troubleshooting.md)
