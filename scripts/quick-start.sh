@@ -28,9 +28,13 @@ done
 # podman is an alternative to docker
 if [[ " ${missing[*]} " == *" docker "* ]] && command -v podman &>/dev/null; then
     echo "  podman: $(command -v podman) (docker alternative)"
-    missing=("${missing[@]/docker}")
+    filtered=()
+    for item in "${missing[@]}"; do
+        [ "$item" != "docker" ] && filtered+=("$item")
+    done
+    missing=("${filtered[@]}")
 fi
-if [ ${#missing[@]} -gt 0 ] && [ -n "$(echo "${missing[@]}" | tr -d ' ')" ]; then
+if [ ${#missing[@]} -gt 0 ]; then
     echo ""
     echo "ERROR: missing required tools: ${missing[*]}"
     echo "Install them before running this script. See:"
