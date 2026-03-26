@@ -60,6 +60,13 @@ EOF
 
 > **Note:** `bound_audiences` must match an audience (`aud`) claim present in the user's access token. Vault requires at least one entry if the token contains an `aud` claim.
 
+Verify the policy and role were created:
+
+```sh
+vault policy read authorino
+vault read auth/jwt/role/authorino
+```
+
 ## Step 2: Store a GitHub PAT in Vault
 
 Store each user's GitHub PAT in Vault, keyed by their OIDC subject claim (`sub`):
@@ -73,6 +80,12 @@ Replace `<user-sub>` with the user's OIDC subject identifier (e.g., a username o
 > **Note:** The `sub` claim must be present in the access token for the Vault path lookup to work. Some identity providers (e.g., Keycloak 26+) use lightweight access tokens that omit `sub` by default. Configure your IdP to include it, or use a different claim in the Vault URL expression.
 
 The PAT needs at minimum `read:user` scope. Adjust scopes based on which GitHub MCP tools your users need access to.
+
+Verify the secret was stored:
+
+```sh
+vault kv get secret/mcp-gateway/<user-sub>
+```
 
 ## Step 3: Create the AuthPolicy
 
@@ -156,6 +169,9 @@ kubectl get authpolicy github-vault-policy -n mcp-test
 ```
 
 Connect to the gateway using the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) or your MCP client. Log in with your OIDC credentials. Under Tools > List Tools, you should see GitHub tools with prefix `github_`. Calling `github_get_me` should return the GitHub user profile associated with the PAT stored in Vault for the authenticated user.
+
+> [!NOTE]
+> This example uses Keycloak as the OIDC provider. If you're testing locally with self-signed certificates, you may need to accept the Keycloak certificate in your browser first. Navigate to your Keycloak URL directly and accept the certificate warning before connecting.
 
 ## Cleanup
 
