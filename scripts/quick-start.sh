@@ -110,10 +110,6 @@ kubectl wait --for=condition=available --timeout=300s deployment/mcp-test-server
 echo ""
 echo "Verifying setup..."
 echo ""
-kubectl get pods -n mcp-system
-echo ""
-kubectl get pods -n mcp-test
-echo ""
 kubectl get mcpgatewayextension -n mcp-system
 echo ""
 kubectl get mcpserverregistration -n mcp-test
