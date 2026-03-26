@@ -74,7 +74,7 @@ confirm "Step 2: Install Gateway API CRDs and Istio (Gateway API provider)"
 kubectl apply -k "${REPO}/config/gateway-api?ref=${GIT_REF}"
 
 helm repo add istio https://istio-release.storage.googleapis.com/charts
-helm repo update
+helm repo update istio
 helm upgrade --install istio-base istio/base -n istio-system --create-namespace --wait
 helm upgrade --install istiod istio/istiod -n istio-system --wait
 
