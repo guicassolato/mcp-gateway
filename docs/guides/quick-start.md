@@ -15,7 +15,7 @@ Set the release version and run the setup script:
 
 ```bash
 export MCP_GATEWAY_VERSION=0.5.1
-curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/v${MCP_GATEWAY_VERSION}/scripts/quick-start.sh | bash
+curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/main/scripts/quick-start.sh | bash
 ```
 
 The script checks prerequisites, then walks through each step interactively:
