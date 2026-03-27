@@ -1,93 +1,60 @@
 # Quick Start Guide
 
-Get MCP Gateway running in 5 minutes with our automated setup script.
-
-## Overview
-
-This guide uses an automated script that sets up everything you need:
-- Local Kind Kubernetes cluster
-- Gateway API CRDs
-- Istio service mesh
-- MCP Gateway with Helm
-- Example MCP servers
-- Gateway routing configuration
-- MCP Inspector for testing
-
-Perfect for evaluation, demos, and getting started quickly.
+Get MCP Gateway running locally in a Kind cluster.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/engine/install/) or [Podman](https://podman.io/docs/installation) installed and running
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) installed
-- [Helm](https://helm.sh/docs/intro/install/) installed
+- [Helm](https://helm.sh/docs/intro/install/) installed (for Istio)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
-- [Node.js and npm](https://nodejs.org/en/download/) installed (for MCP Inspector)
 
 ## Quick Setup
 
-Set the release version to install:
+Set the release version and run the setup script:
 
 ```bash
 export MCP_GATEWAY_VERSION=0.5.1
+curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/main/scripts/quick-start.sh | bash
 ```
 
-Run the automated setup script:
+The script checks prerequisites, then walks through each step interactively:
+
+1. **Create Kind cluster** with port mapping (`localhost:7001`)
+2. **Install Gateway API CRDs and Istio** as the Gateway API provider
+3. **Create the Gateway** with listeners and a NodePort service
+4. **Install MCP Gateway** CRDs, controller, and MCPGatewayExtension (the controller automatically deploys the broker-router)
+5. **Deploy test MCP servers** and register them with the gateway
+
+Each step describes what it will do and waits for confirmation before proceeding.
+
+## Test with MCP Inspector
+
+Once the script completes, you can use [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to interact with the gateway. This requires [Node.js and npm](https://nodejs.org/en/download/).
 
 ```bash
-# Download and run the setup script
-curl -sSL https://raw.githubusercontent.com/Kuadrant/mcp-gateway/v${MCP_GATEWAY_VERSION}/charts/sample_local_helm_setup.sh | bash
+DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector@latest
 ```
 
-**Or clone the repository and run locally:**
+Open the inspector at [http://localhost:6274](http://localhost:6274) and configure:
 
-```bash
-git clone https://github.com/Kuadrant/mcp-gateway.git
-cd mcp-gateway
-git checkout v${MCP_GATEWAY_VERSION}
-USE_LOCAL_CHART=true ./charts/sample_local_helm_setup.sh
-```
+- **Transport**: Streamable HTTP
+- **URL**: `http://mcp.127-0-0-1.sslip.io:7001/mcp`
 
-## What the Script Does
+Click **Connect**, then browse and test the available tools:
 
-The setup script automatically:
-
-1. **Creates Kind cluster** with proper port mappings
-2. **Installs Gateway API CRDs** for traffic routing
-3. **Deploys Istio** service mesh with Helm
-4. **Sets up Istio Gateway** for external traffic
-5. **Installs MCP Gateway** using the Helm chart
-6. **Deploys test MCP servers** for demonstration
-7. **Configures routing** with HTTPRoute resources
-9. **Launches MCP Inspector** for testing and exploration
-
-## Testing Your Setup
-
-Once the script completes, you'll have:
-
-### MCP Inspector Access
-- **URL**: http://localhost:6274
-- **Gateway URL**: http://mcp.127-0-0-1.sslip.io:7001/mcp
-- **Pre-configured**: The inspector opens with the correct gateway URL
-
-### Available Test Tools
-The setup includes example MCP servers with tools like:
-- `test1_hello_world` - Simple greeting tool
-- `test1_headers` - HTTP header inspection
-- `test2_headers` - Additional header tool
-
-### Try It Out
-1. **Connect**: MCP Inspector should open automatically
-2. **Initialize**: Click "Connect" to initialize the MCP session
-3. **Explore Tools**: Browse available tools in the left panel
-4. **Test Tools**: Try calling `test1_hello_world` or `test1_headers`
-5. **View Logs**: Check the request/response flow
+| Tool | Description |
+|------|-------------|
+| `test1_hi` | Simple greeting |
+| `test1_time` | Current time |
+| `test1_headers` | HTTP header inspection |
+| `test2_hello_world` | Greeting from server 2 |
+| `test2_time` | Current time from server 2 |
+| `test2_headers` | HTTP headers from server 2 |
 
 ## Cleanup
 
-To stop the services and clean up:
-
 ```bash
-# Then delete the Kind cluster
 kind delete cluster
 ```
 
@@ -99,9 +66,7 @@ kind delete cluster
 
 ## Next Steps
 
-Now that you have MCP Gateway running, explore other features:
-
 - **[Authentication](./authentication.md)** - Configure OAuth-based security with Keycloak
-- **[Authorization](./authorization.md)** - Set up fine-grained access
+- **[Authorization](./authorization.md)** - Set up fine-grained access control
 - **[Virtual MCP Servers](./virtual-mcp-servers.md)** - Create focused tool collections for specific use cases
 - **[External MCP Servers](./external-mcp-server.md)** - Connect to external APIs and services
