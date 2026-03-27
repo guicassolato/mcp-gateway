@@ -1,4 +1,4 @@
-FROM node:22.12-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22.12-alpine AS builder
 
 # Install git to clone the upstream repo
 RUN apk add --no-cache git
