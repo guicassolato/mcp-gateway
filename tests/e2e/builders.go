@@ -131,8 +131,7 @@ func (b *TestResourcesBuilder) WithBackendNamespace(namespace string) *TestResou
 	return b
 }
 
-// WithRegistrationName overrides the auto-generated MCPServerRegistration name.
-// use when the name must match an external reference (e.g. Keycloak client IDs).
+// overrides the auto-generated registration name for external references (e.g. keycloak client IDs)
 func (b *TestResourcesBuilder) WithRegistrationName(name string) *TestResourcesBuilder {
 	b.registrationName = name
 	return b

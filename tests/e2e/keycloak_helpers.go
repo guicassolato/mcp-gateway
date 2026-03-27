@@ -17,9 +17,7 @@ import (
 
 var keycloakTokenURL = goenv.GetDefault("KEYCLOAK_TOKEN_URL", "https://keycloak.127-0-0-1.sslip.io:8002/realms/mcp/protocol/openid-connect/token")
 
-// GetKeycloakUserToken obtains an access token via the resource owner password
-// credentials (ROPC) grant. this grant type is deprecated in OAuth 2.1 and is
-// used here for test automation only, not as a production pattern.
+// obtains an access token via ROPC grant (test automation only)
 func GetKeycloakUserToken(username, password string) (string, error) {
 	data := url.Values{
 		"grant_type":    {"password"},

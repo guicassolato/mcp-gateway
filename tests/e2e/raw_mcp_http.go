@@ -72,7 +72,6 @@ func mcpInitialize(url string, headers map[string]string) (string, error) {
 	return sessionID, nil
 }
 
-// mcpNotifyInitialized sends the notifications/initialized notification
 func mcpNotifyInitialized(url, sessionID string, headers map[string]string) error {
 	body := `{"jsonrpc":"2.0","method":"notifications/initialized"}`
 	resp, err := mcpPost(url, sessionID, []byte(body), headers)
@@ -80,11 +79,16 @@ func mcpNotifyInitialized(url, sessionID string, headers map[string]string) erro
 		return fmt.Errorf("notifications/initialized failed: %w", err)
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading notifications/initialized response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("notifications/initialized returned status %d: %s", resp.StatusCode, string(respBody))
+	}
 	return nil
 }
 
-// mcpListTools sends a tools/list request and returns the tool names
 func mcpListTools(url, sessionID string, headers map[string]string) (int, []string, error) {
 	body := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
 	resp, err := mcpPost(url, sessionID, []byte(body), headers)
@@ -94,7 +98,10 @@ func mcpListTools(url, sessionID string, headers map[string]string) (int, []stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return resp.StatusCode, nil, fmt.Errorf("tools/list returned status %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return resp.StatusCode, nil, fmt.Errorf("tools/list returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -118,7 +125,6 @@ func mcpListTools(url, sessionID string, headers map[string]string) (int, []stri
 	return resp.StatusCode, names, nil
 }
 
-// mcpCallTool sends a tools/call request and returns the HTTP status and parsed result content
 func mcpCallTool(url, sessionID, toolName string, args map[string]any, headers map[string]string) (int, []toolContent, error) {
 	params := map[string]any{"name": toolName}
 	if len(args) > 0 {
@@ -142,7 +148,10 @@ func mcpCallTool(url, sessionID, toolName string, args map[string]any, headers m
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return resp.StatusCode, nil, fmt.Errorf("tools/call returned status %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
 		return resp.StatusCode, nil, fmt.Errorf("tools/call returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -160,15 +169,16 @@ func mcpCallTool(url, sessionID, toolName string, args map[string]any, headers m
 	return resp.StatusCode, callResult.Content, nil
 }
 
-// mcpRawPost sends a raw HTTP POST and returns the status code and body.
-// useful for testing non-200 responses where body isn't JSON-RPC.
 func mcpRawPost(url, sessionID string, body []byte, headers map[string]string) (int, string, http.Header, error) {
 	resp, err := mcpPost(url, sessionID, body, headers)
 	if err != nil {
 		return 0, "", nil, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, "", resp.Header, fmt.Errorf("reading response body: %w", err)
+	}
 	return resp.StatusCode, string(respBody), resp.Header, nil
 }
 
