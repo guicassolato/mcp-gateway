@@ -7,13 +7,12 @@ GIT_REF="v${VERSION}"
 REPO="https://github.com/${GITHUB_ORG}/mcp-gateway"
 RAW="https://raw.githubusercontent.com/${GITHUB_ORG}/mcp-gateway/${GIT_REF}"
 
-confirm() {
+output() {
     echo ""
     echo "------------------------------------------------------------"
     echo "$1"
     echo "------------------------------------------------------------"
-    read -r -p "Press Enter to continue (or Ctrl+C to exit)... "
-    echo ""
+    sleep 1
 }
 
 echo "Checking prerequisites..."
@@ -46,7 +45,7 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 echo ""
 
-confirm "Step 1: Create Kind cluster with port mapping (localhost:7001 -> NodePort 30080)"
+output "Step 1: Create Kind cluster with port mapping (localhost:7001 -> NodePort 30080)"
 
 if kind get clusters 2>/dev/null | grep -q '^kind$'; then
     echo "Kind cluster already exists, reusing it."
@@ -69,7 +68,7 @@ nodes:
 EOF
 fi
 
-confirm "Step 2: Install Gateway API CRDs and Istio (Gateway API provider)"
+output "Step 2: Install Gateway API CRDs and Istio (Gateway API provider)"
 
 kubectl apply -k "${REPO}/config/gateway-api?ref=${GIT_REF}"
 
@@ -78,11 +77,11 @@ helm repo update istio
 helm upgrade --install istio-base istio/base -n istio-system --create-namespace --wait
 helm upgrade --install istiod istio/istiod -n istio-system --wait
 
-confirm "Step 3: Create the Gateway and NodePort service"
+output "Step 3: Create the Gateway and NodePort service"
 
 kubectl apply -k "${REPO}/config/istio/gateway?ref=${GIT_REF}"
 
-confirm "Step 4: Install MCP Gateway CRDs, controller, and MCPGatewayExtension"
+output "Step 4: Install MCP Gateway CRDs, controller, and MCPGatewayExtension"
 
 kubectl apply -k "${REPO}/config/crd?ref=${GIT_REF}"
 kubectl apply -k "${REPO}/config/mcp-gateway/overlays/mcp-system?ref=${GIT_REF}"
@@ -94,7 +93,7 @@ kubectl wait --for=condition=available --timeout=120s deployment/mcp-gateway -n 
 echo "Waiting for gateway pod..."
 kubectl wait --for=condition=ready --timeout=120s pod -l gateway.networking.k8s.io/gateway-name=mcp-gateway -n gateway-system
 
-confirm "Step 5: Deploy two test MCP servers and register them"
+output "Step 5: Deploy two test MCP servers and register them"
 
 kubectl apply -f "${RAW}/config/test-servers/namespace.yaml"
 for server in server1 server2; do
