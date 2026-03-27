@@ -277,10 +277,12 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 
 		DeferCleanup(func() {
 			By("Cleanup: removing sessionStore from MCPGatewayExtension")
-			ext := &mcpv1alpha1.MCPGatewayExtension{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
-			ext.Spec.SessionStore = nil
-			Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+			Eventually(func(g Gomega) {
+				ext := &mcpv1alpha1.MCPGatewayExtension{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+				ext.Spec.SessionStore = nil
+				g.Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+			}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 			Expect(WaitForDeploymentReady(SystemNamespace, deploymentName, 1)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, redisSecret)).To(Succeed())
 		})
@@ -302,10 +304,12 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Enabling Redis session cache via sessionStore on MCPGatewayExtension")
-		ext := &mcpv1alpha1.MCPGatewayExtension{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
-		ext.Spec.SessionStore = &mcpv1alpha1.SessionStore{SecretName: redisSecretName}
-		Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+		Eventually(func(g Gomega) {
+			ext := &mcpv1alpha1.MCPGatewayExtension{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+			ext.Spec.SessionStore = &mcpv1alpha1.SessionStore{SecretName: redisSecretName}
+			g.Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 
 		By("Waiting for gateway rollout after enabling Redis")
 		Expect(WaitForDeploymentReplicas(SystemNamespace, deploymentName, 1, gen)).To(Succeed())
