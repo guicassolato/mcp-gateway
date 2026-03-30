@@ -1,17 +1,15 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
 updates:
-  - package-ecosystem: "gomod" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
+    # with 6 groups + ungrouped deps, all slots can fill in a busy week.
+    # historically PRs sit open for days/weeks with no merge process.
+    # if PRs back up, bump to 7-8. if a merge cadence is established, 10.
     open-pull-requests-limit: 5
     reviewers:
       - "david-martin"
@@ -22,3 +20,31 @@ updates:
     labels:
       - "dependencies"
       - "go"
+    # note: istio.io/api pre-releases (alpha/beta/rc) cause PR churn but
+    # dependabot has no stable-only filter for gomod. The PR limit and
+    # superseding behavior handle this well enough in practice.
+    groups:
+      # ~10 modules released together
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+      # k8s.io/api, apimachinery, client-go release in lockstep
+      k8s-core:
+        patterns:
+          - "k8s.io/*"
+      # controller-runtime and gateway-api release on their own cadence
+      k8s-ecosystem:
+        patterns:
+          - "sigs.k8s.io/*"
+      # grpc, protobuf, and genproto are tightly coupled
+      grpc:
+        patterns:
+          - "google.golang.org/*"
+      # stdlib extensions, low risk
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+      # envoy control plane and protoc-gen-validate
+      envoy:
+        patterns:
+          - "github.com/envoyproxy/*"
