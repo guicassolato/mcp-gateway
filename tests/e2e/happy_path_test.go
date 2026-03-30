@@ -277,10 +277,12 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 
 		DeferCleanup(func() {
 			By("Cleanup: removing sessionStore from MCPGatewayExtension")
-			ext := &mcpv1alpha1.MCPGatewayExtension{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
-			ext.Spec.SessionStore = nil
-			Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+			Eventually(func(g Gomega) {
+				ext := &mcpv1alpha1.MCPGatewayExtension{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+				ext.Spec.SessionStore = nil
+				g.Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+			}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 			Expect(WaitForDeploymentReady(SystemNamespace, deploymentName, 1)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, redisSecret)).To(Succeed())
 		})
@@ -302,10 +304,12 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Enabling Redis session cache via sessionStore on MCPGatewayExtension")
-		ext := &mcpv1alpha1.MCPGatewayExtension{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
-		ext.Spec.SessionStore = &mcpv1alpha1.SessionStore{SecretName: redisSecretName}
-		Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+		Eventually(func(g Gomega) {
+			ext := &mcpv1alpha1.MCPGatewayExtension{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: MCPExtensionName, Namespace: SystemNamespace}, ext)).To(Succeed())
+			ext.Spec.SessionStore = &mcpv1alpha1.SessionStore{SecretName: redisSecretName}
+			g.Expect(k8sClient.Update(ctx, ext)).To(Succeed())
+		}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 
 		By("Waiting for gateway rollout after enabling Redis")
 		Expect(WaitForDeploymentReplicas(SystemNamespace, deploymentName, 1, gen)).To(Succeed())
@@ -314,18 +318,18 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		var sessionID string
 		Eventually(func(g Gomega) {
 			var initErr error
-			sessionID, initErr = mcpInitialize(gatewayURL)
+			sessionID, initErr = mcpInitialize(gatewayURL, nil)
 			g.Expect(initErr).NotTo(HaveOccurred())
 		}, TestTimeoutMedium, TestRetryInterval).Should(Succeed())
 		GinkgoWriter.Println("client session ID:", sessionID)
 
-		Expect(mcpNotifyInitialized(gatewayURL, sessionID)).To(Succeed())
+		Expect(mcpNotifyInitialized(gatewayURL, sessionID, nil)).To(Succeed())
 
 		By("Calling headers tool to establish a backend session")
 		toolName := fmt.Sprintf("%s%s", registeredServer.Spec.ToolPrefix, "headers")
 		var backendSessionID string
 		Eventually(func(g Gomega) {
-			content, callErr := mcpCallTool(gatewayURL, sessionID, toolName)
+			_, content, callErr := mcpCallTool(gatewayURL, sessionID, toolName, nil, nil)
 			g.Expect(callErr).NotTo(HaveOccurred())
 			backendSessionID = extractBackendSession(content)
 			g.Expect(backendSessionID).NotTo(BeEmpty(), "expected backend Mcp-Session-Id in tool response")
@@ -338,7 +342,7 @@ var _ = Describe("MCP Gateway Registration Happy Path", func() {
 		By("Calling headers tool with same session ID to verify Redis restored the backend session")
 		var restoredSessionID string
 		Eventually(func(g Gomega) {
-			content, callErr := mcpCallTool(gatewayURL, sessionID, toolName)
+			_, content, callErr := mcpCallTool(gatewayURL, sessionID, toolName, nil, nil)
 			g.Expect(callErr).NotTo(HaveOccurred())
 			restoredSessionID = extractBackendSession(content)
 			g.Expect(restoredSessionID).NotTo(BeEmpty(), "expected backend Mcp-Session-Id in tool response")

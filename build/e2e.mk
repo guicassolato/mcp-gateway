@@ -41,6 +41,11 @@ test-e2e-watch: test-e2e-deps ## Run e2e tests in watch mode for development
 test-e2e-ci: test-e2e-deps enable-debug-logging ## Run e2e tests in CI (no setup, fail fast)
 	$(GINKGO) -v --tags=e2e --timeout=$(E2E_TIMEOUT) --fail-fast ./tests/e2e
 
+# run only auth-focused tests (CI runs this after ci-auth-setup)
+.PHONY: test-e2e-auth-ci
+test-e2e-auth-ci: test-e2e-deps enable-debug-logging ## Run auth e2e tests only (requires ci-auth-setup)
+	$(GINKGO) -v --tags=e2e --timeout=$(E2E_TIMEOUT) --fail-fast --focus="AuthPolicy" ./tests/e2e
+
 .PHONY: enable-debug-logging
 enable-debug-logging: ## Enable debug logging on controller and wait for restart
 	@echo "Enabling debug logging on mcp-controller..."

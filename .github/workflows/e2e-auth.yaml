@@ -1,34 +1,14 @@
-name: E2E Tests
+name: E2E Auth Tests
 
 on:
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'examples/**'
-      - 'LICENSE'
-      - 'charts/**'
-      - 'evals/**'
-      - '.coderabbit.yaml'
-      - '.gitignore'
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'examples/**'
-      - 'LICENSE'
-      - 'charts/**'
-      - 'evals/**'
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e-tests:
+  e2e-auth-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -47,8 +27,11 @@ jobs:
       - name: Setup CI environment
         run: make ci-setup
 
-      - name: Run E2E tests
-        run: make test-e2e-ci
+      - name: Setup auth infrastructure
+        run: make ci-auth-setup
+
+      - name: Run auth E2E tests
+        run: make test-e2e-auth-ci
 
       - name: Collect logs on failure
         if: failure()

@@ -16,6 +16,7 @@ data:
           "publicClient": false,
           "secret": "secret",
           "standardFlowEnabled": false,
+          "directAccessGrantsEnabled": true,
           "attributes": {
             "standard.token.exchange.enabled": "true"
           },

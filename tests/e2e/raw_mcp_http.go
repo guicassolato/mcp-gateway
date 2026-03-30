@@ -36,7 +36,7 @@ func getMCPHTTPClient() *http.Client {
 
 // mcpPost sends a raw HTTP POST to the MCP gateway and returns the response.
 // Caller is responsible for closing the response body.
-func mcpPost(url, sessionID string, body []byte) (*http.Response, error) {
+func mcpPost(url, sessionID string, body []byte, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -46,13 +46,16 @@ func mcpPost(url, sessionID string, body []byte) (*http.Response, error) {
 	if sessionID != "" {
 		req.Header.Set("Mcp-Session-Id", sessionID)
 	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	return getMCPHTTPClient().Do(req)
 }
 
 // mcpInitialize sends an initialize request and returns the session ID from the response header
-func mcpInitialize(url string) (string, error) {
+func mcpInitialize(url string, headers map[string]string) (string, error) {
 	body := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"e2e-raw","version":"0.0.1"}}}`
-	resp, err := mcpPost(url, "", []byte(body))
+	resp, err := mcpPost(url, "", []byte(body), headers)
 	if err != nil {
 		return "", fmt.Errorf("initialize request failed: %w", err)
 	}
@@ -69,44 +72,114 @@ func mcpInitialize(url string) (string, error) {
 	return sessionID, nil
 }
 
-// mcpNotifyInitialized sends the notifications/initialized notification
-func mcpNotifyInitialized(url, sessionID string) error {
+func mcpNotifyInitialized(url, sessionID string, headers map[string]string) error {
 	body := `{"jsonrpc":"2.0","method":"notifications/initialized"}`
-	resp, err := mcpPost(url, sessionID, []byte(body))
+	resp, err := mcpPost(url, sessionID, []byte(body), headers)
 	if err != nil {
 		return fmt.Errorf("notifications/initialized failed: %w", err)
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading notifications/initialized response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("notifications/initialized returned status %d: %s", resp.StatusCode, string(respBody))
+	}
 	return nil
 }
 
-// mcpCallTool sends a tools/call request and returns the parsed result content
-func mcpCallTool(url, sessionID, toolName string) ([]toolContent, error) {
-	body := fmt.Sprintf(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"%s"}}`, toolName)
-	resp, err := mcpPost(url, sessionID, []byte(body))
+func mcpListTools(url, sessionID string, headers map[string]string) (int, []string, error) {
+	body := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
+	resp, err := mcpPost(url, sessionID, []byte(body), headers)
 	if err != nil {
-		return nil, fmt.Errorf("tools/call failed: %w", err)
+		return 0, nil, fmt.Errorf("tools/list failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("tools/call returned status %d: %s", resp.StatusCode, string(respBody))
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return resp.StatusCode, nil, fmt.Errorf("tools/list returned status %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
+		return resp.StatusCode, nil, fmt.Errorf("tools/list returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	result, err := readJSONRPCResult(resp)
 	if err != nil {
-		return nil, err
+		return resp.StatusCode, nil, err
+	}
+
+	var listResult struct {
+		Tools []struct {
+			Name string `json:"name"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal(result, &listResult); err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("failed to parse tools/list result: %w: %s", err, string(result))
+	}
+	names := make([]string, len(listResult.Tools))
+	for i, t := range listResult.Tools {
+		names[i] = t.Name
+	}
+	return resp.StatusCode, names, nil
+}
+
+func mcpCallTool(url, sessionID, toolName string, args map[string]any, headers map[string]string) (int, []toolContent, error) {
+	params := map[string]any{"name": toolName}
+	if len(args) > 0 {
+		params["arguments"] = args
+	}
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params":  params,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to marshal tools/call: %w", err)
+	}
+
+	resp, err := mcpPost(url, sessionID, body, headers)
+	if err != nil {
+		return 0, nil, fmt.Errorf("tools/call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return resp.StatusCode, nil, fmt.Errorf("tools/call returned status %d (body unreadable: %w)", resp.StatusCode, readErr)
+		}
+		return resp.StatusCode, nil, fmt.Errorf("tools/call returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	result, err := readJSONRPCResult(resp)
+	if err != nil {
+		return resp.StatusCode, nil, err
 	}
 
 	var callResult struct {
 		Content []toolContent `json:"content"`
 	}
 	if err := json.Unmarshal(result, &callResult); err != nil {
-		return nil, fmt.Errorf("failed to parse tool result: %w: %s", err, string(result))
+		return resp.StatusCode, nil, fmt.Errorf("failed to parse tool result: %w: %s", err, string(result))
 	}
-	return callResult.Content, nil
+	return resp.StatusCode, callResult.Content, nil
+}
+
+func mcpRawPost(url, sessionID string, body []byte, headers map[string]string) (int, string, http.Header, error) {
+	resp, err := mcpPost(url, sessionID, body, headers)
+	if err != nil {
+		return 0, "", nil, err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, "", resp.Header, fmt.Errorf("reading response body: %w", err)
+	}
+	return resp.StatusCode, string(respBody), resp.Header, nil
 }
 
 type toolContent struct {
